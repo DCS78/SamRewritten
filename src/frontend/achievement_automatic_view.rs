@@ -132,6 +132,9 @@ pub fn create_achievements_automatic_view(
         achievement_box.append(&remaining_time_label);
         entry_box.append(&achievement_box);
         entry_box.append(&global_percentage_progress_bar);
+        let list_item = list_item
+            .downcast_ref::<gtk::ListItem>()
+            .expect("list_item must be a ListItem");
         list_item.set_child(Some(&entry_box));
 
         list_item

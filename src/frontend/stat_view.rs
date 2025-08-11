@@ -15,23 +15,17 @@
 
 use super::request::{Request, SetFloatStat, SetIntStat};
 use super::stat::GStatObject;
-use gtk::gio::{ListStore, spawn_blocking};
-use gtk::glib::SignalHandlerId;
-use gtk::glib::object::Cast;
-use gtk::glib::translate::FromGlib;
-use gtk::pango::EllipsizeMode;
-use gtk::prelude::{
-    BoxExt, GObjectPropertyExpressionExt, ListItemExt, ObjectExt, ToValue, WidgetExt,
-};
 use gtk::{
+    gio::{ListStore, spawn_blocking},
+    glib::{self, SignalHandlerId, object::Cast, translate::FromGlib},
+    pango::EllipsizeMode,
+    prelude::*,
     Adjustment, Align, Box, ClosureExpression, FilterListModel, Frame, Label, ListItem, ListView,
     NoSelection, Orientation, ScrolledWindow, SignalListItemFactory, SpinButton, StringFilter,
-    StringFilterMatchMode, Widget, glib,
+    StringFilterMatchMode, Widget,
 };
-use std::cell::RefCell;
-use std::ffi::c_ulong;
-use std::sync::mpsc::channel;
-use std::time::Duration;
+use glib::prelude::ToValue;
+use std::{cell::RefCell, ffi::c_ulong, sync::mpsc::channel, time::Duration};
 
 pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
     let stats_list_factory = SignalListItemFactory::new();
@@ -46,8 +40,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
         .model(&app_stats_model)
         .filter(&app_stats_string_filter)
         .build();
-    let app_stats_selection_model = NoSelection::new(Option::<ListStore>::None);
-    app_stats_selection_model.set_model(Some(&app_stats_filter_model));
+    let app_stats_selection_model = NoSelection::new(Some(app_stats_filter_model.clone()));
 
     let app_stats_list_view = ListView::builder()
         .orientation(Orientation::Vertical)
@@ -103,6 +96,9 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
         stat_box.append(&protected_icon);
 
         stat_box.append(&button_box);
+        let list_item = list_item
+            .downcast_ref::<gtk::ListItem>()
+            .expect("list_item must be a ListItem");
         list_item.set_child(Some(&stat_box));
 
         // Expression bindings
@@ -242,15 +238,16 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok())
             .expect("Could not find SpinButton widget");
 
-        let sender = RefCell::new(channel::<f64>().0);
+    let sender = RefCell::new(channel::<f64>().0);
 
         let handler_id = spin_button.connect_value_changed(move |button| {
-            if sender.borrow_mut().send(button.value()).is_ok() {
+            let val = button.value();
+            if sender.borrow_mut().send(val).is_ok() {
                 return;
             }
             let (new_sender, receiver) = channel();
             *sender.borrow_mut() = new_sender;
-            let mut value = button.value();
+            let mut value = val;
             let integer_stat = stat_object.is_integer();
             let stat_id = stat_object.id().clone();
             let stat_object_clone = stat_object.clone();
@@ -259,7 +256,6 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             glib::spawn_future_local(async move {
                 let join_handle = spawn_blocking(move || {
                     while let Ok(new) = receiver.recv_timeout(Duration::from_millis(500)) {
-                        // value = new; is not used, there can be floating point math imprecisions
                         value = (new * 100.0).round() / 100.0;
                     }
 
@@ -267,7 +263,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                         SetIntStat {
                             app_id,
                             stat_id,
-                            value: value as i32,
+                            value: value.round() as i32,
                         }
                         .request()
                     } else {

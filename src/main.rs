@@ -23,14 +23,12 @@ mod frontend;
 mod steam_client;
 mod utils;
 
-use std::process::Command;
 
-use crate::backend::app::app;
-use crate::backend::orchestrator::orchestrator;
-use crate::utils::arguments::parse_cli_arguments;
-use crate::utils::bidir_child::BidirChild;
+use std::process::Command;
+use crate::backend::{app::app, orchestrator::orchestrator};
+use crate::utils::{arguments::parse_cli_arguments, bidir_child::BidirChild};
 use frontend::main_ui;
-use gtk::glib;
+use gtk::glib::{self, ExitCode};
 use utils::app_paths::get_executable_path;
 
 const APP_ID: &str = "org.sam_authors.sam_rewritten";
@@ -38,23 +36,20 @@ const APP_ID: &str = "org.sam_authors.sam_rewritten";
 fn main() -> glib::ExitCode {
     let arguments = parse_cli_arguments();
 
-    if arguments.is_orchestrator {
-        let mut tx = arguments.tx.unwrap();
-        let mut rx = arguments.rx.unwrap();
-        let exit_code = orchestrator(&mut tx, &mut rx);
-        return glib::ExitCode::from(exit_code);
-    }
 
-    if arguments.is_app > 0 {
+    if arguments.is_orchestrator || arguments.is_app > 0 {
         let mut tx = arguments.tx.unwrap();
         let mut rx = arguments.rx.unwrap();
-        let exit_code = app(arguments.is_app, &mut tx, &mut rx);
-        return glib::ExitCode::from(exit_code);
+        let exit_code = if arguments.is_orchestrator {
+            orchestrator(&mut tx, &mut rx)
+        } else {
+            app(arguments.is_app, &mut tx, &mut rx)
+        };
+        return ExitCode::from(exit_code as u8);
     }
 
     let current_exe = get_executable_path();
     let orchestrator = BidirChild::new(Command::new(current_exe).arg("--orchestrator"))
         .expect("Failed to spawn orchestrator process");
-
     main_ui(orchestrator)
 }

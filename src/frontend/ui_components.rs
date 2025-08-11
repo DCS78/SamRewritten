@@ -15,11 +15,11 @@
 
 use crate::frontend::MainApplication;
 use crate::frontend::application_actions::set_app_action_enabled;
-use gtk::gdk::Paintable;
-use gtk::gdk_pixbuf::Pixbuf;
+use gtk::prelude::Cast;
 use gtk::{
-    AboutDialog, ApplicationWindow, Image, License, MenuButton, PopoverMenu, PositionType,
-    gdk_pixbuf,
+    AboutDialog, ApplicationWindow, License, MenuButton, PopoverMenu, PositionType,
+    gdk_pixbuf::{Pixbuf, Colorspace},
+    gdk::Paintable,
 };
 use std::io::Cursor;
 
@@ -32,12 +32,7 @@ pub fn create_about_dialog(window: &ApplicationWindow) -> AboutDialog {
         .license_type(License::Gpl30)
         .version(env!("CARGO_PKG_VERSION"))
         .program_name("SamRewritten")
-        .authors(
-            env!("CARGO_PKG_AUTHORS")
-                .replace(" -@- ", "@")
-                .split(':')
-                .collect::<Vec<_>>(),
-        )
+    .authors(env!("CARGO_PKG_AUTHORS").replace(" -@- ", "@").split(':').collect::<Vec<_>>())
         .comments(env!("CARGO_PKG_DESCRIPTION"))
         .logo(&logo)
         .build()
@@ -45,21 +40,15 @@ pub fn create_about_dialog(window: &ApplicationWindow) -> AboutDialog {
 
 pub fn load_logo() -> Paintable {
     let image_bytes = include_bytes!("../../assets/icon_256.png");
-
+    use gtk::gdk::Texture;
     if let Ok(logo_pixbuf) = Pixbuf::from_read(Cursor::new(image_bytes)) {
-        Image::from_pixbuf(Some(&logo_pixbuf))
-            .paintable()
-            .expect("Failed to create logo image")
+        Texture::for_pixbuf(&logo_pixbuf).into()
     } else {
         eprintln!("[CLIENT] Failed to load logo. Using a gray square.");
-
-        let pixbuf = Pixbuf::new(gdk_pixbuf::Colorspace::Rgb, true, 8, 1, 1)
+        let pixbuf = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1)
             .expect("Failed to create minimal pixbuf fallback");
         pixbuf.fill(0x808080FF);
-
-        Image::from_pixbuf(Some(&pixbuf))
-            .paintable()
-            .expect("Failed to create logo image")
+        Texture::for_pixbuf(&pixbuf).into()
     }
 }
 

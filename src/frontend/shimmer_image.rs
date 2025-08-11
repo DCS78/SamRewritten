@@ -18,7 +18,8 @@ use gtk::glib::subclass::types::ObjectSubclassIsExt;
 
 glib::wrapper! {
     pub struct ShimmerImage(ObjectSubclass<imp::ShimmerImage>)
-        @extends gtk::Widget;
+        @extends gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 impl ShimmerImage {
@@ -48,10 +49,7 @@ mod imp {
     use gtk::prelude::*;
     use gtk::subclass::prelude::*;
     use reqwest::blocking::Client;
-    use std::cell::{Cell, RefCell};
-    use std::env::temp_dir;
-    use std::fs::{exists, write};
-    use std::sync::mpsc::{Receiver, TryRecvError, sync_channel};
+    use std::{cell::{Cell, RefCell}, env::temp_dir, fs::{exists, write}, sync::mpsc::{Receiver, TryRecvError, sync_channel}};
 
     const GRADIENT_WIDTH: f32 = 0.8;
     const BASE_COLOR: RGBA = RGBA::new(0.7, 0.7, 0.7, 1.0);
@@ -191,18 +189,23 @@ mod imp {
     impl ShimmerImage {
         fn load(&self, url: &str) {
             self.failed.set(false);
-            let split = url.split("://").collect::<Vec<&str>>();
-            if split.len() != 2 {
+
+            let mut split = url.splitn(2, "://");
+            let scheme = split.next();
+            let rest = split.next();
+            if scheme.is_none() || rest.is_none() {
                 dev_println!("[CLIENT] Invalid URL: {url}");
                 self.failed.set(true);
                 return;
             }
+            let scheme = scheme.unwrap();
+            let rest = rest.unwrap();
 
             let (sender, receiver) = sync_channel::<Texture>(0);
             self.receiver.borrow_mut().replace(receiver);
             let failed = self.failed.clone();
 
-            match split[0] {
+            match scheme {
                 "https" => {
                     let mut path = temp_dir();
                     let url = url.to_string();
@@ -255,9 +258,8 @@ mod imp {
                     });
                 }
                 "file" => {
-                    let file_path = split[1].to_string();
+                    let file_path = rest.to_string();
                     spawn_blocking(move || {
-                        // std::thread::sleep(std::time::Duration::from_millis(5000));
                         let data = match std::fs::read(&file_path) {
                             Ok(data) => data,
                             Err(error) => {
@@ -273,9 +275,7 @@ mod imp {
                             }
                             Err(error) => {
                                 failed.set(true);
-                                eprintln!(
-                                    "[CLIENT] Failed to create {file_path} from bytes: {error}"
-                                );
+                                eprintln!("[CLIENT] Failed to create {file_path} from bytes: {error}");
                             }
                         }
                     });

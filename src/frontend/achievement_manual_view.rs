@@ -13,30 +13,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::dev_println;
-use crate::frontend::MainApplication;
-use crate::frontend::achievement::GAchievementObject;
-use crate::frontend::achievement_view::count_unlocked_achievements;
-use crate::frontend::custom_progress_bar_widget::CustomProgressBar;
-use crate::frontend::request::{Request, SetAchievement};
-use crate::frontend::shimmer_image::ShimmerImage;
-use crate::utils::format::format_seconds_to_mm_ss;
-use gtk::gio::{ListStore, spawn_blocking};
-use gtk::glib::translate::FromGlib;
-use gtk::glib::{MainContext, SignalHandlerId, clone};
-use gtk::pango::EllipsizeMode;
-use gtk::prelude::*;
+use crate::{
+    dev_println,
+    frontend::{
+        MainApplication,
+        achievement::GAchievementObject,
+        achievement_view::count_unlocked_achievements,
+        custom_progress_bar_widget::CustomProgressBar,
+        request::{Request, SetAchievement},
+        shimmer_image::ShimmerImage,
+    },
+    utils::format::format_seconds_to_mm_ss,
+};
 use gtk::{
+    gio::{ListStore, spawn_blocking},
+    glib::{self, MainContext, SignalHandlerId, clone, translate::FromGlib},
+    pango::EllipsizeMode,
+    prelude::*,
     Adjustment, Align, Box, Button, ClosureExpression, Frame, Label, ListBox, ListBoxRow, ListItem,
     ListView, NoSelection, Orientation, Overlay, ScrolledWindow, SelectionMode,
-    SignalListItemFactory, SpinButton, Stack, StackTransitionType, Switch, Widget, glib,
+    SignalListItemFactory, SpinButton, Stack, StackTransitionType, Switch, Widget
 };
-use std::cell::Cell;
-use std::cmp::Ordering;
-use std::ffi::c_ulong;
-use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use std::{cell::Cell, cmp::Ordering, ffi::c_ulong, rc::Rc, sync::{Arc, atomic::AtomicBool}};
 
 #[inline]
 fn create_header(
@@ -55,32 +53,16 @@ fn create_header(
     let label_achievements_over = Label::new(Some("unlocked over"));
     let label_achievements_minutes = Label::new(Some("minutes"));
 
-    let adjustment_achievements_count = Adjustment::builder()
-        .lower(0.0)
-        .upper(i32::MAX as f64)
-        .step_increment(1.0)
-        .build();
-    let spin_button_achievements_count = SpinButton::builder()
-        .adjustment(&adjustment_achievements_count)
-        .digits(0)
-        .build();
-    let adjustment_minutes_count = Adjustment::builder()
-        .lower(0.0)
-        .upper(i32::MAX as f64)
-        .step_increment(1.0)
-        .build();
-    let spin_button_minutes_count = SpinButton::builder()
-        .adjustment(&adjustment_minutes_count)
-        .digits(0)
-        .build();
+    let adjustment_achievements_count = Adjustment::builder().lower(0.0).upper(i32::MAX as f64).step_increment(1.0).build();
+    let spin_button_achievements_count = SpinButton::builder().adjustment(&adjustment_achievements_count).digits(0).build();
+    let adjustment_minutes_count = Adjustment::builder().lower(0.0).upper(i32::MAX as f64).step_increment(1.0).build();
+    let spin_button_minutes_count = SpinButton::builder().adjustment(&adjustment_minutes_count).digits(0).build();
 
-    let spacer = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .hexpand(true)
-        .build();
+    let spacer = Box::builder().orientation(Orientation::Horizontal).hexpand(true).build();
     let button_start = Button::builder().label("Start").build();
     let cancelled_task = Arc::new(AtomicBool::new(false));
 
+    // Header row: [Get to] [spin] [unlocked over] [spin] [minutes] [spacer] [Start]
     hbox.append(&label_unlock);
     hbox.append(&spin_button_achievements_count);
     hbox.append(&label_achievements_over);
@@ -350,6 +332,9 @@ pub fn create_achievements_manual_view(
             .build();
         overlay.add_overlay(&achievement_box);
         overlay.set_measure_overlay(&achievement_box, true);
+        let list_item = list_item
+            .downcast_ref::<gtk::ListItem>()
+            .expect("list_item must be a ListItem");
         list_item.set_child(Some(&overlay));
 
         list_item

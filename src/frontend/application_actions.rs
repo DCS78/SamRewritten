@@ -13,13 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::dev_println;
-use crate::frontend::MainApplication;
-use gtk::AboutDialog;
-use gtk::gio::SimpleAction;
-use gtk::glib;
-use gtk::glib::clone;
-use gtk::prelude::*;
+use crate::{dev_println, frontend::MainApplication};
+use gtk::{AboutDialog, gio::SimpleAction, prelude::*};
 
 pub fn setup_app_actions(
     application: &MainApplication,
@@ -29,39 +24,48 @@ pub fn setup_app_actions(
     reset_all_stats_and_achievements_action: &SimpleAction,
 ) {
     let action_show_about_dialog = SimpleAction::new("about", None);
-    action_show_about_dialog.connect_activate(clone!(
-        #[weak]
-        about_dialog,
+    action_show_about_dialog.connect_activate({
+        let about_dialog = about_dialog.clone();
         move |_, _| {
-            about_dialog.show();
+            about_dialog.present();
         }
-    ));
+    });
 
     let action_quit = SimpleAction::new("quit", None);
-    action_quit.connect_activate(clone!(
-        #[weak]
-        application,
+    action_quit.connect_activate({
+        let application = application.clone();
         move |_, _| {
             application.quit();
         }
-    ));
+    });
 
-    application.add_action(refresh_app_list_action);
-    application.add_action(refresh_achievements_list_action);
-    application.add_action(reset_all_stats_and_achievements_action);
-    application.add_action(&action_show_about_dialog);
-    application.add_action(&action_quit);
-    application.set_accels_for_action("app.refresh_app_list", &["F5"]);
-    application.set_accels_for_action("app.refresh_achievements_list", &["F5"]);
+    for action in [
+        refresh_app_list_action,
+        refresh_achievements_list_action,
+        reset_all_stats_and_achievements_action,
+        &action_show_about_dialog,
+        &action_quit,
+    ] {
+        application.add_action(action);
+    }
+
+    // Assign F5 to both refresh actions
+    for accel in ["app.refresh_app_list", "app.refresh_achievements_list"] {
+        application.set_accels_for_action(accel, &["F5"]);
+    }
 }
 
 pub fn set_app_action_enabled(application: &MainApplication, action_name: &str, enabled: bool) {
-    if let Some(action) = application.lookup_action(action_name) {
-        action
-            .downcast_ref::<SimpleAction>()
-            .unwrap()
-            .set_enabled(enabled);
-    } else {
-        dev_println!("[CLIENT] Action not found {action_name}");
+    match application.lookup_action(action_name) {
+        Some(action) => {
+            if let Some(simple_action) = action.downcast_ref::<SimpleAction>() {
+                simple_action.set_enabled(enabled);
+            } else {
+                dev_println!("[CLIENT] Action '{action_name}' is not a SimpleAction");
+            }
+        }
+        None => {
+            dev_println!("[CLIENT] Action not found: {action_name}");
+        }
     }
 }

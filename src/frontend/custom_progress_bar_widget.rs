@@ -15,13 +15,12 @@
 
 use gtk::glib;
 
-// This widget is used to display a plain color on a given percentage of width
-// use "value" to indicate the percentage of width to fill
-// minimum: 0, maximum: 100
+// CustomProgressBar: displays a plain color on a given percentage of width (0-100)
 
 glib::wrapper! {
     pub struct CustomProgressBar(ObjectSubclass<imp::CustomProgressBar>)
-        @extends gtk::Widget;
+        @extends gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 impl CustomProgressBar {
@@ -72,15 +71,8 @@ mod imp {
             let widget = self.obj();
             let width = widget.width() as f32;
             let height = widget.height() as f32;
-            let value = self.value.get();
-
+            let value = self.value.get().clamp(0.0, 100.0);
             let progress_width = width * (value / 100.0);
-
-            // Draw the background of the progress bar
-            // let background_rect = Rect::new(0.0, 0.0, width, height);
-            // snapshot.append_color(&RGBA::new(0.8, 0.8, 0.8, 1.0), &background_rect);
-
-            // Draw the progress bar itself
             let progress_rect = Rect::new(0.0, 0.0, progress_width, height);
             snapshot.append_color(&BAR_COLOR, &progress_rect);
         }

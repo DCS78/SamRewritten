@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -13,6 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+// --- Standard Library Imports ---
+use std::sync::RwLock;
+
+// --- External Crate Imports ---
+use once_cell::sync::Lazy;
+use gtk::{glib::ExitCode, prelude::*};
+
+// --- Internal Crate Imports ---
+use crate::APP_ID;
+use crate::frontend::request::Request;
+use crate::utils::bidir_child::BidirChild;
+use app_list_view::create_main_ui;
+
+// --- Global State ---
+pub static DEFAULT_PROCESS: Lazy<RwLock<Option<BidirChild>>> = Lazy::new(|| RwLock::new(None));
+
+// --- Module Declarations (alphabetical) ---
 mod achievement;
 mod achievement_automatic_view;
 mod achievement_manual_view;
@@ -29,34 +47,20 @@ mod stat_view;
 mod steam_app;
 mod ui_components;
 
-use crate::APP_ID;
-use crate::frontend::request::Request;
-use crate::utils::bidir_child::BidirChild;
-use app_list_view::create_main_ui;
-use gtk::glib::ExitCode;
-use gtk::prelude::{ApplicationExt, ApplicationExtManual};
+// --- Main Application Logic ---
 use request::Shutdown;
-use std::sync::RwLock;
-
-static DEFAULT_PROCESS: RwLock<Option<BidirChild>> = RwLock::new(None);
 
 fn shutdown() {
-    match Shutdown.request() {
-        Err(err) => {
-            eprintln!("[CLIENT] Failed to send shutdown message: {}", err);
-            return;
-        }
-        Ok(_) => {}
-    };
-
+    if let Err(err) = Shutdown.request() {
+        eprintln!("[CLIENT] Failed to send shutdown message: {}", err);
+        return;
+    }
     let mut guard = DEFAULT_PROCESS.write().unwrap();
-    if let Some(ref mut bidir) = *guard {
-        bidir
-            .child
-            .wait()
-            .expect("[CLIENT] Failed to wait on orchestrator to shutdown");
-    } else {
-        panic!("[CLIENT] No orchestrator process to shutdown");
+    match &mut *guard {
+        Some(bidir) => {
+            bidir.child.wait().expect("[CLIENT] Failed to wait on orchestrator to shutdown");
+        }
+        None => panic!("[CLIENT] No orchestrator process to shutdown"),
     }
 }
 
@@ -66,21 +70,12 @@ pub type MainApplication = gtk::Application;
 pub type MainApplication = adw::Application;
 
 pub fn main_ui(orchestrator: BidirChild) -> ExitCode {
-    {
-        let mut guard = DEFAULT_PROCESS.write().unwrap();
-        *guard = Some(orchestrator);
-    }
-
+    *DEFAULT_PROCESS.write().unwrap() = Some(orchestrator);
     let main_app = MainApplication::builder()
         .application_id(APP_ID)
-        .flags(
-            gtk::gio::ApplicationFlags::HANDLES_COMMAND_LINE
-                | gtk::gio::ApplicationFlags::NON_UNIQUE,
-        )
+        .flags(gtk::gio::ApplicationFlags::HANDLES_COMMAND_LINE | gtk::gio::ApplicationFlags::NON_UNIQUE)
         .build();
-
-    main_app.connect_command_line(create_main_ui);
-    // main_app.connect_activate(create_main_ui);
+    main_app.connect_command_line(|app, cmd| create_main_ui(app, cmd));
     main_app.connect_shutdown(move |_| shutdown());
     main_app.run()
 }
