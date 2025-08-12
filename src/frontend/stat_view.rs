@@ -15,16 +15,16 @@
 
 use super::request::{Request, SetFloatStat, SetIntStat};
 use super::stat::GStatObject;
+use glib::prelude::ToValue;
 use gtk::{
+    Adjustment, Align, Box, ClosureExpression, FilterListModel, Frame, Label, ListItem, ListView,
+    NoSelection, Orientation, ScrolledWindow, SignalListItemFactory, SpinButton, StringFilter,
+    StringFilterMatchMode, Widget,
     gio::{ListStore, spawn_blocking},
     glib::{self, SignalHandlerId, object::Cast, translate::FromGlib},
     pango::EllipsizeMode,
     prelude::*,
-    Adjustment, Align, Box, ClosureExpression, FilterListModel, Frame, Label, ListItem, ListView,
-    NoSelection, Orientation, ScrolledWindow, SignalListItemFactory, SpinButton, StringFilter,
-    StringFilterMatchMode, Widget,
 };
-use glib::prelude::ToValue;
 use std::{cell::RefCell, ffi::c_ulong, sync::mpsc::channel, time::Duration};
 
 /// Create the stats view, including model, filter, and UI.
@@ -98,9 +98,12 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
 
         stat_box.append(&button_box);
         let list_item = list_item
-            .downcast_ref::<gtk::ListItem>()
-            .expect("list_item must be a ListItem");
-        list_item.set_child(Some(&stat_box));
+            .downcast_ref::<gtk::ListItem>();
+        if let Some(list_item) = list_item {
+            list_item.set_child(Some(&stat_box));
+        } else {
+            log::error!("list_item was not a ListItem; skipping child set");
+        }
 
         // Expression bindings
         list_item
@@ -148,7 +151,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                 let is_integer = values
                     .get(1)
                     .and_then(|val| val.get::<bool>().ok())
-                    .unwrap_or(false);
+                    .unwrap_or(false); // fallback to false if error
                 let step_increment = if is_integer { 1.0 } else { 0.01 };
                 Some(step_increment.to_value())
             });
@@ -157,11 +160,11 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let original_value = values
                 .get(1)
                 .and_then(|val| val.get::<f64>().ok())
-                .unwrap_or(0f64);
+                .unwrap_or(0f64); // fallback to 0.0 if error
             let is_increment_only = values
                 .get(2)
                 .and_then(|val| val.get::<bool>().ok())
-                .unwrap_or(false);
+                .unwrap_or(false); // fallback to false if error
 
             let lower = if is_increment_only {
                 original_value
@@ -175,7 +178,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let is_integer = values
                 .get(1)
                 .and_then(|val| val.get::<bool>().ok())
-                .unwrap_or(false);
+                .unwrap_or(false); // fallback to false if error
             let digits: u32 = if is_integer { 0 } else { 2 };
             Some(digits.to_value())
         });
@@ -184,7 +187,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let permission = values
                 .get(1)
                 .and_then(|val| val.get::<i32>().ok())
-                .unwrap_or(0);
+                .unwrap_or(0); // fallback to 0 if error
             let is_sensitive = (permission & 2) == 0;
             Some(is_sensitive.to_value())
         });
@@ -193,7 +196,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let permission = values
                 .get(1)
                 .and_then(|val| val.get::<i32>().ok())
-                .unwrap_or(0);
+                .unwrap_or(0); // fallback to 0 if error
             let is_protected = (permission & 2) != 0;
             Some(is_protected.to_value())
         });
@@ -222,24 +225,34 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
     });
 
     stats_list_factory.connect_bind(move |_, list_item| unsafe {
-        let list_item = list_item
-            .downcast_ref::<ListItem>()
-            .expect("Needs to be a ListItem");
+        let list_item = list_item.downcast_ref::<ListItem>();
+        if list_item.is_none() {
+            log::error!("ListItem cast failed in bind");
+            return;
+        }
+        let list_item = list_item.unwrap();
         let stat_object = list_item
             .item()
-            .and_then(|item| item.downcast::<GStatObject>().ok())
-            .expect("Item should be a GStatObject");
-
+            .and_then(|item| item.downcast::<GStatObject>().ok());
+        if stat_object.is_none() {
+            log::error!("Item was not a GStatObject");
+            return;
+        }
+        let stat_object = stat_object.unwrap();
         let spin_button = list_item
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
-            .and_then(|stat_box| stat_box.last_child()) // This gets button_box
+            .and_then(|stat_box| stat_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok())
-            .and_then(|button_box| button_box.last_child()) // This gets spin_button
-            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok())
-            .expect("Could not find SpinButton widget");
+            .and_then(|button_box| button_box.last_child())
+            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok());
+        if spin_button.is_none() {
+            log::error!("Could not find SpinButton widget");
+            return;
+        }
+        let spin_button = spin_button.unwrap();
 
-    let sender = RefCell::new(channel::<f64>().0);
+        let sender = RefCell::new(channel::<f64>().0);
 
         let handler_id = spin_button.connect_value_changed(move |button| {
             let val = button.value();
@@ -283,7 +296,13 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                 });
 
                 let (success, debounced_value) =
-                    join_handle.await.expect("spawn_blocking task panicked");
+                    match join_handle.await {
+                        Ok((success, debounced_value)) => (success, debounced_value),
+                        Err(e) => {
+                            log::error!("spawn_blocking task panicked: {e}");
+                            (false, value)
+                        }
+                    };
 
                 if success {
                     stat_object_clone.set_original_value(debounced_value);
@@ -297,18 +316,24 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
     });
 
     stats_list_factory.connect_unbind(move |_, list_item| unsafe {
-        let list_item = list_item
-            .downcast_ref::<ListItem>()
-            .expect("Needs to be a ListItem");
-
+        let list_item = list_item.downcast_ref::<ListItem>();
+        if list_item.is_none() {
+            log::error!("ListItem cast failed in unbind");
+            return;
+        }
+        let list_item = list_item.unwrap();
         let spin_button = list_item
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
-            .and_then(|stat_box| stat_box.last_child()) // This gets button_box
+            .and_then(|stat_box| stat_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok())
-            .and_then(|button_box| button_box.last_child()) // This gets spin_button
-            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok())
-            .expect("Could not find SpinButton widget");
+            .and_then(|button_box| button_box.last_child())
+            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok());
+        if spin_button.is_none() {
+            log::error!("Could not find SpinButton widget");
+            return;
+        }
+        let spin_button = spin_button.unwrap();
 
         // Disconnect previous handler if it exists
         if let Some(handler_id) = spin_button.data("handler") {

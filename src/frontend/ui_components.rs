@@ -18,8 +18,8 @@ use crate::frontend::application_actions::set_app_action_enabled;
 use gtk::prelude::Cast;
 use gtk::{
     AboutDialog, ApplicationWindow, License, MenuButton, PopoverMenu, PositionType,
-    gdk_pixbuf::{Pixbuf, Colorspace},
     gdk::Paintable,
+    gdk_pixbuf::{Colorspace, Pixbuf},
 };
 use std::io::Cursor;
 
@@ -33,7 +33,12 @@ pub fn create_about_dialog(window: &ApplicationWindow) -> AboutDialog {
         .license_type(License::Gpl30)
         .version(env!("CARGO_PKG_VERSION"))
         .program_name("SamRewritten")
-        .authors(env!("CARGO_PKG_AUTHORS").replace(" -@- ", "@").split(':').collect::<Vec<_>>())
+        .authors(
+            env!("CARGO_PKG_AUTHORS")
+                .replace(" -@- ", "@")
+                .split(':')
+                .collect::<Vec<_>>(),
+        )
         .comments(env!("CARGO_PKG_DESCRIPTION"))
         .logo(&logo)
         .build()

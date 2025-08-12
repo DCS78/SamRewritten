@@ -17,8 +17,8 @@
 use std::sync::RwLock;
 
 // --- External Crate Imports ---
-use once_cell::sync::Lazy;
 use gtk::{glib::ExitCode, prelude::*};
+use once_cell::sync::Lazy;
 
 // --- Internal Crate Imports ---
 use crate::APP_ID;
@@ -58,7 +58,10 @@ fn shutdown() {
     let mut guard = DEFAULT_PROCESS.write().unwrap();
     match &mut *guard {
         Some(bidir) => {
-            bidir.child.wait().expect("[CLIENT] Failed to wait on orchestrator to shutdown");
+            bidir
+                .child
+                .wait()
+                .expect("[CLIENT] Failed to wait on orchestrator to shutdown");
         }
         none => panic!("[CLIENT] No orchestrator process to shutdown"),
     }
@@ -74,7 +77,10 @@ pub fn main_ui(orchestrator: BidirChild) -> ExitCode {
     *DEFAULT_PROCESS.write().unwrap() = Some(orchestrator);
     let main_app = MainApplication::builder()
         .application_id(APP_ID)
-        .flags(gtk::gio::ApplicationFlags::HANDLES_COMMAND_LINE | gtk::gio::ApplicationFlags::NON_UNIQUE)
+        .flags(
+            gtk::gio::ApplicationFlags::HANDLES_COMMAND_LINE
+                | gtk::gio::ApplicationFlags::NON_UNIQUE,
+        )
         .build();
 
     // Set Adwaita color scheme to match OS theme

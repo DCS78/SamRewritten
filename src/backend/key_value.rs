@@ -12,6 +12,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
+use crate::backend::types::KeyValueEncoding;
 use std::{
     collections::HashMap,
     error::Error,
@@ -21,8 +22,6 @@ use std::{
     path::Path,
     sync::LazyLock,
 };
-use crate::backend::types::KeyValueEncoding;
-
 
 /// Errors that can occur when working with KeyValue structures.
 #[derive(Debug)]
@@ -56,7 +55,6 @@ impl From<std::io::Error> for KeyValueError {
         KeyValueError::Io(err)
     }
 }
-
 
 /// The type of value stored in a KeyValue node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,7 +92,6 @@ impl TryFrom<u8> for KeyValueType {
     }
 }
 
-
 /// The data held by a KeyValue node.
 #[derive(Debug, Clone)]
 pub enum KeyValueData {
@@ -105,7 +102,6 @@ pub enum KeyValueData {
     UInt64(u64),
     Color(u32),
 }
-
 
 /// A node in a hierarchical key-value tree.
 #[derive(Debug, Clone)]
@@ -119,7 +115,6 @@ pub struct KeyValue {
     /// Whether this node is valid.
     pub valid: bool,
 }
-
 
 impl KeyValue {
     /// Returns a reference to a static invalid KeyValue node.

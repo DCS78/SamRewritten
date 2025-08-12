@@ -16,16 +16,10 @@
 #[cfg(test)]
 mod tests {
     use crate::backend::{
-        app_manager::AppManager,
-        connected_steam::ConnectedSteam,
-        key_value::KeyValue,
+        app_manager::AppManager, connected_steam::ConnectedSteam, key_value::KeyValue,
     };
     use crate::steam_client::steam_apps_001_wrapper::SteamApps001AppDataKeys;
-    use std::{
-        env,
-        path::PathBuf,
-    };
-
+    use std::{env, path::PathBuf};
 
     /// Test fetching achievements for a known app.
     #[test]
@@ -38,7 +32,6 @@ mod tests {
         println!("{achievements:?}");
     }
 
-
     /// Test fetching stats for a known app.
     #[test]
     fn get_stats_no_message() {
@@ -46,7 +39,6 @@ mod tests {
         let stats = app_manager.get_statistics().expect("Failed to get stats");
         println!("{stats:?}");
     }
-
 
     /// Test resetting all stats for a known app.
     #[test]
@@ -57,7 +49,6 @@ mod tests {
             .expect("Failed to reset stats");
         println!("Success: {success:?}");
     }
-
 
     /// Test brute-forcing various app data keys for SteamApps001.
     #[test]
@@ -107,7 +98,6 @@ mod tests {
         try_force("homepage");
         try_force("clienticon");
     }
-
 
     /// Test loading a binary KeyValue file from disk.
     #[test]

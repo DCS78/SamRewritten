@@ -18,17 +18,16 @@
     windows_subsystem = "windows"
 )]
 
-
 mod backend;
 mod frontend;
 mod steam_client;
 mod utils;
 
-use std::process::Command;
-use gtk::glib::{self, ExitCode};
 use crate::backend::{app::app, orchestrator::orchestrator};
 use crate::utils::{arguments::parse_cli_arguments, bidir_child::BidirChild};
 use frontend::main_ui;
+use gtk::glib::{self, ExitCode};
+use std::process::Command;
 use utils::app_paths::get_executable_path;
 
 /// The application ID for SamRewritten.
@@ -41,7 +40,10 @@ fn main() -> glib::ExitCode {
     if arguments.is_orchestrator || arguments.is_app > 0 {
         let (mut tx, mut rx) = match (arguments.tx, arguments.rx) {
             (Some(tx), Some(rx)) => (tx, rx),
-            _ => panic!("Missing required IPC channels for orchestrator/app mode"),
+            _ => {
+                eprintln!("Missing required IPC channels for orchestrator/app mode");
+                return ExitCode::FAILURE;
+            }
         };
         let exit_code = if arguments.is_orchestrator {
             orchestrator(&mut tx, &mut rx)
@@ -52,7 +54,12 @@ fn main() -> glib::ExitCode {
     }
 
     let current_exe = get_executable_path();
-    let orchestrator = BidirChild::new(Command::new(current_exe).arg("--orchestrator"))
-        .expect("Failed to spawn orchestrator process");
+    let orchestrator = match BidirChild::new(Command::new(current_exe).arg("--orchestrator")) {
+        Ok(child) => child,
+        Err(e) => {
+            eprintln!("Failed to spawn orchestrator process: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     main_ui(orchestrator)
 }

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::Write;
-use interprocess::unnamed_pipe::{Recver, Sender};
 use crate::{
     backend::{
         app_manager::AppManager,
@@ -24,6 +22,8 @@ use crate::{
     steam_client::steamworks_types::AppId_t,
     utils::ipc_types::{SamError, SamSerializable, SteamCommand, SteamResponse},
 };
+use interprocess::unnamed_pipe::{Recver, Sender};
+use std::io::Write;
 
 /// Entrypoint for the app process. Handles IPC and delegates to AppManager.
 pub fn app(app_id: AppId_t, parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {

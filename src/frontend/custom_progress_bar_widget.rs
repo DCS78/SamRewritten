@@ -25,9 +25,7 @@ glib::wrapper! {
 impl CustomProgressBar {
     /// Create a new CustomProgressBar with value initialized to 0.
     pub fn new() -> Self {
-        glib::Object::builder()
-            .property("value", 0f32)
-            .build()
+        glib::Object::builder().property("value", 0f32).build()
     }
 }
 
@@ -40,10 +38,8 @@ mod imp {
     use gtk::subclass::prelude::*;
     use std::cell::Cell;
 
-
     // TODO: If building with Adwaita, use the platform accent color
     const BAR_COLOR: RGBA = RGBA::new(0.6, 0.6, 0.9, 0.2);
-
 
     /// Internal implementation of CustomProgressBar properties.
     #[derive(Default, Properties)]
@@ -53,14 +49,12 @@ mod imp {
         pub value: Cell<f32>, // Value from 0 to 100
     }
 
-
     #[glib::object_subclass]
     impl ObjectSubclass for CustomProgressBar {
         const NAME: &'static str = "CustomProgressBar";
         type Type = super::CustomProgressBar;
         type ParentType = gtk::Widget;
     }
-
 
     #[glib::derived_properties]
     impl ObjectImpl for CustomProgressBar {

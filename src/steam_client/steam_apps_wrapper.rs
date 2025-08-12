@@ -42,14 +42,15 @@ impl SteamApps {
     /// Panics if the vtable pointer is null.
     pub fn get_current_game_language(&self) -> String {
         unsafe {
-            let vtable = (*self.inner.ptr)
-                .vtable
-                .as_ref()
-                .expect("Null ISteamApps vtable");
-            let lang_ptr = (vtable.get_current_game_language)(self.inner.ptr);
-            std::ffi::CStr::from_ptr(lang_ptr)
-                .to_string_lossy()
-                .into_owned()
+            if let Some(vtable) = (*self.inner.ptr).vtable.as_ref() {
+                let lang_ptr = (vtable.get_current_game_language)(self.inner.ptr);
+                std::ffi::CStr::from_ptr(lang_ptr)
+                    .to_string_lossy()
+                    .into_owned()
+            } else {
+                log::error!("Null ISteamApps vtable in get_current_game_language");
+                String::new()
+            }
         }
     }
 

@@ -13,46 +13,41 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    env,
-    path::PathBuf,
-};
 use crate::utils::ipc_types::SamError;
+use std::{env, path::PathBuf};
 
 /// Returns the absolute path to the current executable, resolving symlinks.
-pub fn get_executable_path() -> PathBuf {
-    env::current_exe()
-        .expect("Failed to get current executable path")
-        .canonicalize()
-        .expect("Failed to canonicalize path")
+pub fn get_executable_path() -> Result<PathBuf, SamError> {
+    let exe = env::current_exe().map_err(|_| SamError::UnknownError)?;
+    let canonical = exe.canonicalize().map_err(|_| SamError::UnknownError)?;
+    Ok(canonical)
 }
 
 /// Returns a valid directory for persistent app data (Linux).
 #[inline]
 #[cfg(target_os = "linux")]
-pub fn get_app_cache_dir() -> String {
+pub fn get_app_cache_dir() -> Result<String, SamError> {
     use std::fs;
     if let Ok(snap_name) = env::var("SNAP_NAME") {
         if snap_name == "samrewritten" {
-            return env::var("SNAP_USER_COMMON").unwrap_or_else(|_| String::from("/tmp"));
+            return Ok(env::var("SNAP_USER_COMMON").unwrap_or_else(|_| String::from("/tmp")));
         }
         // Most likely a dev config
-        return ".".to_owned();
+        return Ok(".".to_owned());
     }
     // Non-snap release
     let folder = env::var("HOME").unwrap_or_else(|_| "/tmp".to_owned()) + "/.cache/samrewritten";
-    fs::create_dir_all(&folder).expect("Could not create temp folder");
-    folder
+    fs::create_dir_all(&folder).map_err(|_| SamError::UnknownError)?;
+    Ok(folder)
 }
 
 /// Returns a valid directory for persistent app data (Windows).
 #[inline]
 #[cfg(target_os = "windows")]
-pub fn get_app_cache_dir() -> String {
-    env::temp_dir()
-        .to_str()
-        .expect("Failed to convert temp dir to string")
-        .to_owned()
+pub fn get_app_cache_dir() -> Result<String, SamError> {
+    let temp = env::temp_dir();
+    let temp_str = temp.to_str().ok_or(SamError::UnknownError)?;
+    Ok(temp_str.to_owned())
 }
 
 /// Returns the path to the Steam client library (Linux).
@@ -64,7 +59,7 @@ pub fn get_steamclient_lib_path() -> Result<PathBuf, SamError> {
         let path_str = real_home + "/snap/steam/common/.local/share/Steam/linux64/steamclient.so";
         return Ok(Path::new(&path_str).to_owned());
     }
-    let home = env::var("HOME").expect("Failed to get home dir");
+    let home = env::var("HOME").map_err(|_| SamError::UnknownError)?;
     let lib_paths = [
         home.clone() + "/snap/steam/common/.local/share/Steam/linux64/steamclient.so",
         home.clone() + "/.steam/debian-installation/linux64/steamclient.so",
@@ -122,7 +117,7 @@ pub fn get_user_game_stats_schema_path(app_id: &u32) -> Result<String, SamError>
             + &app_id.to_string()
             + ".bin");
     }
-    let home = env::var("HOME").expect("Failed to get home dir");
+    let home = env::var("HOME").map_err(|_| SamError::UnknownError)?;
     let install_dirs = [
         home.clone() + "/snap/steam/common/.local/share/Steam",
         home.clone() + "/.steam/debian-installation",
@@ -166,7 +161,7 @@ pub fn get_local_app_banner_file_path(app_id: &u32) -> Result<String, SamError> 
             + &app_id.to_string()
             + "/header.jpg");
     }
-    let home = env::var("HOME").expect("Failed to get home dir");
+    let home = env::var("HOME").map_err(|_| SamError::UnknownError)?;
     let install_dirs = [
         home.clone() + "/snap/steam/common/.local/share/Steam",
         home.clone() + "/.steam/debian-installation",

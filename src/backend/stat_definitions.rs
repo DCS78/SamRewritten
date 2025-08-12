@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -21,7 +20,6 @@ use std::{
     time::SystemTime,
 };
 
-
 /// Bitflags for stat permissions and properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StatFlags {
@@ -29,7 +27,6 @@ pub struct StatFlags {
 }
 
 impl StatFlags {
-
     /// No flags set.
     pub const NONE: StatFlags = StatFlags { bits: 0 };
     /// Stat can only be incremented.
@@ -68,7 +65,6 @@ impl BitOrAssign for StatFlags {
     }
 }
 
-
 /// Error returned when attempting to modify a protected stat.
 #[derive(Debug, Clone)]
 pub struct StatIsProtectedError {
@@ -97,14 +93,12 @@ impl fmt::Display for StatIsProtectedError {
 
 impl std::error::Error for StatIsProtectedError {}
 
-
 /// Definition of a stat (float or integer).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StatDefinition {
     Float(FloatStatDefinition),
     Integer(IntegerStatDefinition),
 }
-
 
 /// Common fields for all stat definitions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,7 +108,6 @@ pub struct BaseStatDefinition {
     pub display_name: String,
     pub permission: i32,
 }
-
 
 /// Definition for a floating-point stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,7 +120,6 @@ pub struct FloatStatDefinition {
     pub default_value: f32,
 }
 
-
 /// Definition for an integer stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegerStatDefinition {
@@ -139,7 +131,6 @@ pub struct IntegerStatDefinition {
     pub set_by_trusted_game_server: bool,
     pub default_value: i32,
 }
-
 
 /// Runtime info for a stat (float or integer).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,7 +176,6 @@ impl StatInfo {
     }
 }
 
-
 /// Runtime info for a floating-point stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FloatStatInfo {
@@ -229,7 +219,6 @@ impl FloatStatInfo {
         flags
     }
 }
-
 
 /// Runtime info for an integer stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,7 +264,6 @@ impl IntStatInfo {
     }
 }
 
-
 /// Definition of an achievement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AchievementDefinition {
@@ -303,7 +291,6 @@ impl fmt::Display for AchievementDefinition {
         )
     }
 }
-
 
 /// Runtime info for an achievement.
 #[derive(Debug, Clone, Serialize, Deserialize)]

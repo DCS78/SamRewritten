@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-
 //! Provides a safe Rust abstraction over the `ISteamClient` FFI interface.
 use crate::steam_client::steam_apps_001_vtable::{ISteamApps001, STEAMAPPS001_INTERFACE_VERSION};
 use crate::steam_client::steam_apps_001_wrapper::SteamApps001;
@@ -99,11 +98,11 @@ impl<'a> SteamClient {
     /// Panics if the vtable pointer is null.
     pub fn release_user(&self, pipe: HSteamPipe, user: HSteamUser) {
         unsafe {
-            let vtable = (*self.inner.ptr)
-                .vtable
-                .as_ref()
-                .expect("SteamClient vtable was null");
-            (vtable.release_user)(self.inner.ptr, pipe, user);
+            if let Some(vtable) = (*self.inner.ptr).vtable.as_ref() {
+                (vtable.release_user)(self.inner.ptr, pipe, user);
+            } else {
+                log::error!("SteamClient vtable was null in release_user");
+            }
         }
     }
 

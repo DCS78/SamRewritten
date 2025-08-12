@@ -13,23 +13,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Read, Write},
-    process::Command,
-};
-use interprocess::unnamed_pipe::{Recver, Sender};
-use crate::backend::{
-    app_lister::AppLister,
-    connected_steam::ConnectedSteam,
-};
 #[cfg(debug_assertions)]
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
+use crate::backend::{app_lister::AppLister, connected_steam::ConnectedSteam};
 use crate::dev_println;
 use crate::utils::{
     app_paths::get_executable_path,
     bidir_child::BidirChild,
     ipc_types::{SamError, SamSerializable, SteamCommand, SteamResponse},
+};
+use interprocess::unnamed_pipe::{Recver, Sender};
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+    process::Command,
 };
 
 /// Sends a command to a child app process and returns the response as bytes.
@@ -67,8 +64,8 @@ pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
     loop {
         dev_println!("[ORCHESTRATOR] Main loop...");
 
-        let message = SteamCommand::from_recver(parent_rx)
-            .expect("[ORCHESTRATOR] No message from pipe");
+        let message =
+            SteamCommand::from_recver(parent_rx).expect("[ORCHESTRATOR] No message from pipe");
 
         dev_println!("[ORCHESTRATOR] Received message: {message:?}");
 

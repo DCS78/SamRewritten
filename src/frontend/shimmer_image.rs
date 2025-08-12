@@ -51,7 +51,12 @@ mod imp {
     use gtk::prelude::*;
     use gtk::subclass::prelude::*;
     use reqwest::blocking::Client;
-    use std::{cell::{Cell, RefCell}, env::temp_dir, fs::{exists, write}, sync::mpsc::{Receiver, TryRecvError, sync_channel}};
+    use std::{
+        cell::{Cell, RefCell},
+        env::temp_dir,
+        fs::{exists, write},
+        sync::mpsc::{Receiver, TryRecvError, sync_channel},
+    };
 
     const GRADIENT_WIDTH: f32 = 0.8;
     const BASE_COLOR: RGBA = RGBA::new(0.7, 0.7, 0.7, 1.0);
@@ -278,7 +283,9 @@ mod imp {
                             }
                             Err(error) => {
                                 failed.set(true);
-                                eprintln!("[CLIENT] Failed to create {file_path} from bytes: {error}");
+                                eprintln!(
+                                    "[CLIENT] Failed to create {file_path} from bytes: {error}"
+                                );
                             }
                         }
                     });

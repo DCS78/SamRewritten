@@ -18,32 +18,38 @@ use crate::{
     backend::app_lister::{AppModel, AppModelType},
     frontend::{
         MainApplication,
+        achievement::GAchievementObject,
         app_list_view_callbacks::switch_from_app_list_to_app,
         app_view::create_app_view,
         application_actions::{set_app_action_enabled, setup_app_actions},
-        request::{GetOwnedAppList, Request, ResetStats, StopApp, GetAchievements, GetStats},
+        request::{GetAchievements, GetOwnedAppList, GetStats, Request, ResetStats, StopApp},
         shimmer_image::ShimmerImage,
-        steam_app::GSteamAppObject,
-        ui_components::{create_about_dialog, create_context_menu_button, set_context_popover_to_app_list_context},
-        achievement::GAchievementObject,
         stat::GStatObject,
+        steam_app::GSteamAppObject,
+        ui_components::{
+            create_about_dialog, create_context_menu_button,
+            set_context_popover_to_app_list_context,
+        },
     },
     utils::{arguments::parse_gui_arguments, ipc_types::SamError},
 };
-use std::process::Command;
-use std::os::raw::c_ulong;
 use gtk::glib::SignalHandlerId;
 use gtk::{
-    gio::{ApplicationCommandLine, ListStore, SimpleAction, spawn_blocking},
-    glib::{self, clone, MainContext, ExitCode},
-    prelude::*,
-    Align, ApplicationWindow, Box, Button, FilterListModel, HeaderBar, Image, Label, ListItem,
-    ListView, NoSelection, Orientation, PolicyType, ScrolledWindow, SearchEntry,
+    Align, ApplicationWindow, Box, Button, FilterListModel, HeaderBar, IconSize, Image, Label,
+    ListItem, ListView, NoSelection, Orientation, PolicyType, ScrolledWindow, SearchEntry,
     SignalListItemFactory, Spinner, Stack, StackTransitionType, StringFilter,
-    StringFilterMatchMode, Widget, IconSize
+    StringFilterMatchMode, Widget,
+    gio::{ApplicationCommandLine, ListStore, SimpleAction, spawn_blocking},
+    glib::{self, ExitCode, MainContext, clone},
+    prelude::*,
 };
+use std::os::raw::c_ulong;
+use std::process::Command;
 use std::{cell::Cell, rc::Rc};
-pub fn create_main_ui(application: &MainApplication, cmd_line: &ApplicationCommandLine) -> ExitCode {
+pub fn create_main_ui(
+    application: &MainApplication,
+    cmd_line: &ApplicationCommandLine,
+) -> ExitCode {
     let gui_args = parse_gui_arguments(cmd_line);
     let launch_app_by_id_visible = Rc::new(Cell::new(false));
     let app_id = Rc::new(Cell::new(Option::<u32>::None));
@@ -232,68 +238,96 @@ pub fn create_main_ui(application: &MainApplication, cmd_line: &ApplicationComma
         }
     });
 
-/// Helper to setup a list item row for the app list view.
-fn setup_list_item(list_item: &ListItem) {
-    let image = ShimmerImage::new();
-    let label = Label::builder().margin_start(20).build();
-    let spacer = Box::builder().orientation(Orientation::Horizontal).hexpand(true).build();
+    /// Helper to setup a list item row for the app list view.
+    fn setup_list_item(list_item: &ListItem) {
+        let image = ShimmerImage::new();
+        let label = Label::builder().margin_start(20).build();
+        let spacer = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .hexpand(true)
+            .build();
 
-    let make_button = |icon_name: &str, label_text: &str| {
-        let icon = Image::builder().icon_name(icon_name).pixel_size(11).build();
-        let label = Label::builder().label(label_text).build();
-        let box_ = Box::builder().spacing(8).margin_start(10).margin_end(10).build();
-        box_.append(&icon);
-        box_.append(&label);
-        Button::builder().child(&box_).margin_top(20).margin_bottom(20).margin_end(20).margin_start(20).build()
-    };
-    let launch_button = make_button("media-playback-start-symbolic", "Launch");
+        let make_button = |icon_name: &str, label_text: &str| {
+            let icon = Image::builder().icon_name(icon_name).pixel_size(11).build();
+            let label = Label::builder().label(label_text).build();
+            let box_ = Box::builder()
+                .spacing(8)
+                .margin_start(10)
+                .margin_end(10)
+                .build();
+            box_.append(&icon);
+            box_.append(&label);
+            Button::builder()
+                .child(&box_)
+                .margin_top(20)
+                .margin_bottom(20)
+                .margin_end(20)
+                .margin_start(20)
+                .build()
+        };
+        let launch_button = make_button("media-playback-start-symbolic", "Launch");
 
-    let manage_box = {
-        let icon = Image::builder().icon_name("document-edit-symbolic").pixel_size(11).build();
-        let label = Label::builder().label("Manage").build();
-        let box_ = Box::builder().spacing(8).margin_start(10).margin_end(10).build();
-        box_.append(&icon);
-        box_.append(&label);
-        box_
-    };
-    let manage_button = Button::builder()
-        .child(&manage_box)
-        .css_classes(vec!["suggested-action"])
-        .build();
-    let manage_new_button = Button::builder().icon_name("window-new-symbolic").build();
-    if let Some(child) = manage_new_button.child() {
-        if let Ok(img) = child.downcast::<Image>() {
-            img.set_pixel_size(11);
+        let manage_box = {
+            let icon = Image::builder()
+                .icon_name("document-edit-symbolic")
+                .pixel_size(11)
+                .build();
+            let label = Label::builder().label("Manage").build();
+            let box_ = Box::builder()
+                .spacing(8)
+                .margin_start(10)
+                .margin_end(10)
+                .build();
+            box_.append(&icon);
+            box_.append(&label);
+            box_
+        };
+        let manage_button = Button::builder()
+            .child(&manage_box)
+            .css_classes(vec!["suggested-action"])
+            .build();
+        let manage_new_button = Button::builder().icon_name("window-new-symbolic").build();
+        if let Some(child) = manage_new_button.child() {
+            if let Ok(img) = child.downcast::<Image>() {
+                img.set_pixel_size(11);
+            }
         }
+        let manage_button_box = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .css_classes(vec!["linked"])
+            .margin_top(20)
+            .margin_bottom(20)
+            .margin_end(20)
+            .build();
+        manage_button_box.append(&manage_button);
+        manage_button_box.append(&manage_new_button);
+
+        let entry = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .margin_top(4)
+            .margin_bottom(4)
+            .margin_start(8)
+            .margin_end(8)
+            .build();
+        entry.append(&image);
+        entry.append(&label);
+        entry.append(&spacer);
+        entry.append(&launch_button);
+        entry.append(&manage_button_box);
+
+        let list_item = list_item
+            .downcast_ref::<ListItem>()
+            .expect("Needs to be a ListItem");
+        list_item.set_child(Some(&entry));
+        list_item
+            .property_expression("item")
+            .chain_property::<GSteamAppObject>("app_name")
+            .bind(&label, "label", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GSteamAppObject>("image_url")
+            .bind(&image, "url", Widget::NONE);
     }
-    let manage_button_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .css_classes(vec!["linked"])
-        .margin_top(20)
-        .margin_bottom(20)
-        .margin_end(20)
-        .build();
-    manage_button_box.append(&manage_button);
-    manage_button_box.append(&manage_new_button);
-
-    let entry = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(4)
-        .margin_bottom(4)
-        .margin_start(8)
-        .margin_end(8)
-        .build();
-    entry.append(&image);
-    entry.append(&label);
-    entry.append(&spacer);
-    entry.append(&launch_button);
-    entry.append(&manage_button_box);
-
-    let list_item = list_item.downcast_ref::<ListItem>().expect("Needs to be a ListItem");
-    list_item.set_child(Some(&entry));
-    list_item.property_expression("item").chain_property::<GSteamAppObject>("app_name").bind(&label, "label", Widget::NONE);
-    list_item.property_expression("item").chain_property::<GSteamAppObject>("image_url").bind(&image, "url", Widget::NONE);
-}
 
     list_factory.connect_bind(clone!(
         #[strong]
@@ -694,8 +728,8 @@ fn setup_list_item(list_item: &ListItem) {
         app_stats_count_value,
         #[weak]
         app_stack,
-    #[weak]
-    achievements_manual_adjustment,
+        #[weak]
+        achievements_manual_adjustment,
         #[weak]
         achievements_manual_start,
         #[weak]

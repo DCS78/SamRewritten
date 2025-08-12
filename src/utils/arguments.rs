@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    cell::Cell,
-    env,
-    process::exit,
-    rc::Rc,
-};
+use crate::dev_println;
 use gtk::gio::ApplicationCommandLine;
 use gtk::prelude::ApplicationCommandLineExt;
 use interprocess::unnamed_pipe::{Recver, Sender};
@@ -26,8 +21,7 @@ use interprocess::unnamed_pipe::{Recver, Sender};
 use std::os::fd::FromRawFd;
 #[cfg(windows)]
 use std::os::windows::io::{FromRawHandle, RawHandle};
-use crate::dev_println;
-
+use std::{cell::Cell, env, process::exit, rc::Rc};
 
 /// Parsed command-line arguments for orchestrator/app mode.
 #[derive(Debug)]
@@ -71,35 +65,61 @@ pub fn parse_cli_arguments() -> CliArguments {
             }
 
             if key == "--app" {
-                args.is_app = value.parse::<u32>().unwrap();
+                match value.parse::<u32>() {
+                    Ok(val) => args.is_app = val,
+                    Err(_) => {
+                        eprintln!("Invalid value for --app: {}", value);
+                        exit(1);
+                    }
+                }
                 continue;
             }
 
             #[cfg(target_os = "linux")]
             if key == "--tx" {
-                let raw_handle = value.parse::<i32>().expect("Invalid value for --tx");
-                args.tx = Some(unsafe { Sender::from_raw_fd(raw_handle) });
+                match value.parse::<i32>() {
+                    Ok(raw_handle) => args.tx = Some(unsafe { Sender::from_raw_fd(raw_handle) }),
+                    Err(_) => {
+                        eprintln!("Invalid value for --tx: {}", value);
+                        exit(1);
+                    }
+                }
                 continue;
             }
 
             #[cfg(target_os = "windows")]
             if key == "--tx" {
-                let raw_handle = value.parse::<usize>().expect("Invalid value for --tx") as RawHandle;
-                args.tx = Some(unsafe { Sender::from_raw_handle(raw_handle) });
+                match value.parse::<usize>() {
+                    Ok(raw_handle) => args.tx = Some(unsafe { Sender::from_raw_handle(raw_handle as RawHandle) }),
+                    Err(_) => {
+                        eprintln!("Invalid value for --tx: {}", value);
+                        exit(1);
+                    }
+                }
                 continue;
             }
 
             #[cfg(target_os = "linux")]
             if key == "--rx" {
-                let raw_handle = value.parse::<i32>().expect("Invalid value for --rx");
-                args.rx = Some(unsafe { Recver::from_raw_fd(raw_handle) });
+                match value.parse::<i32>() {
+                    Ok(raw_handle) => args.rx = Some(unsafe { Recver::from_raw_fd(raw_handle) }),
+                    Err(_) => {
+                        eprintln!("Invalid value for --rx: {}", value);
+                        exit(1);
+                    }
+                }
                 continue;
             }
 
             #[cfg(target_os = "windows")]
             if key == "--rx" {
-                let raw_handle = value.parse::<usize>().expect("Invalid value for --rx") as RawHandle;
-                args.rx = Some(unsafe { Recver::from_raw_handle(raw_handle) });
+                match value.parse::<usize>() {
+                    Ok(raw_handle) => args.rx = Some(unsafe { Recver::from_raw_handle(raw_handle as RawHandle) }),
+                    Err(_) => {
+                        eprintln!("Invalid value for --rx: {}", value);
+                        exit(1);
+                    }
+                }
                 continue;
             }
         }

@@ -17,14 +17,13 @@ use crate::frontend::MainApplication;
 use crate::frontend::achievement::GAchievementObject;
 use crate::frontend::custom_progress_bar_widget::CustomProgressBar;
 use crate::frontend::shimmer_image::ShimmerImage;
-use gtk::glib::{self, clone};
 use gtk::ClosureExpression;
+use gtk::glib::{self, clone};
 use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
 use gtk::{
-    Align, Box, Button, Frame, Label, ListBox, ListBoxRow, ListView,
-    NoSelection, Orientation, ScrolledWindow, SelectionMode, SignalListItemFactory, Stack,
-    StackTransitionType, Widget,
+    Align, Box, Button, Frame, Label, ListBox, ListBoxRow, ListView, NoSelection, Orientation,
+    ScrolledWindow, SelectionMode, SignalListItemFactory, Stack, StackTransitionType, Widget,
 };
 
 /// Create the header for the automatic achievements view.

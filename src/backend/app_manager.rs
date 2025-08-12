@@ -13,18 +13,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    env,
-    path::PathBuf,
-    time::UNIX_EPOCH,
-};
 use crate::{
     backend::{
         connected_steam::ConnectedSteam,
         key_value::KeyValue,
         stat_definitions::{
-            AchievementDefinition, AchievementInfo, BaseStatDefinition, FloatStatDefinition, FloatStatInfo,
-            IntStatInfo, IntegerStatDefinition, StatDefinition, StatInfo,
+            AchievementDefinition, AchievementInfo, BaseStatDefinition, FloatStatDefinition,
+            FloatStatInfo, IntStatInfo, IntegerStatDefinition, StatDefinition, StatInfo,
         },
         types::UserStatType,
     },
@@ -35,11 +30,9 @@ use crate::{
         },
         wrapper_types::SteamCallbackId,
     },
-    utils::{
-        app_paths::get_user_game_stats_schema_path,
-        ipc_types::SamError,
-    },
+    utils::{app_paths::get_user_game_stats_schema_path, ipc_types::SamError},
 };
+use std::{env, path::PathBuf, time::UNIX_EPOCH};
 
 /// Manages stats, achievements, and definitions for a Steam app.
 #[derive(Debug)]

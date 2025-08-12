@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::process::{Child, Command};
-use interprocess::unnamed_pipe::{Recver, Sender};
 use crate::utils::ipc_types::SamError;
 #[cfg(unix)]
 use interprocess::unnamed_pipe::pipe;
+use interprocess::unnamed_pipe::{Recver, Sender};
 #[cfg(unix)]
 use std::os::fd::IntoRawFd;
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, OwnedHandle};
-
+use std::process::{Child, Command};
 
 /// Represents a child process with bidirectional unnamed pipes for IPC.
 #[derive(Debug)]
@@ -38,9 +37,10 @@ pub struct BidirChild {
 impl BidirChild {
     /// Spawns a new child process with bidirectional unnamed pipes for IPC (Unix).
     #[cfg(unix)]
+
     pub fn new(command: &mut Command) -> Result<Self, SamError> {
-        let (parent_to_child_tx, parent_to_child_rx) = pipe().expect("Unable to create a pipe");
-        let (child_to_parent_tx, child_to_parent_rx) = pipe().expect("Unable to create a pipe");
+        let (parent_to_child_tx, parent_to_child_rx) = pipe().map_err(|_| SamError::UnknownError)?;
+        let (child_to_parent_tx, child_to_parent_rx) = pipe().map_err(|_| SamError::UnknownError)?;
 
         let child_to_parent_tx_handle: i32 = child_to_parent_tx.into_raw_fd();
         let parent_to_child_rx_handle: i32 = parent_to_child_rx.into_raw_fd();
@@ -68,12 +68,12 @@ impl BidirChild {
             interprocess::os::windows::unnamed_pipe::CreationOptions::default()
                 .inheritable(true)
                 .build()
-                .expect("Failed to create handle");
+                .map_err(|_| SamError::UnknownError)?;
         let (child_to_parent_tx, child_to_parent_rx) =
             interprocess::os::windows::unnamed_pipe::CreationOptions::default()
                 .inheritable(true)
                 .build()
-                .expect("Failed to create handle");
+                .map_err(|_| SamError::UnknownError)?;
 
         let child_to_parent_tx_handle: OwnedHandle = child_to_parent_tx.into();
         let parent_to_child_rx_handle: OwnedHandle = parent_to_child_rx.into();

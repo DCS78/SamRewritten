@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-
 //! Provides a safe Rust abstraction over the `ISteamApps001` FFI interface.
 //! This module allows safe access to Steam application data via the Steamworks API.
 use crate::steam_client::steam_apps_001_vtable::ISteamApps001;

@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::io::Read;
 use interprocess::unnamed_pipe::Recver;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use std::io::Read;
 
 /// Error types for orchestrator/app IPC.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -76,7 +76,13 @@ pub trait SamSerializable {
     where
         Self: Sized + Serialize,
     {
-        let serialized = serde_json::to_string(&self).unwrap();
+        let serialized = match serde_json::to_string(&self) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[IPC] Serialization error: {e}");
+                return vec![];
+            }
+        };
         let s_bytes = serialized.as_bytes();
         let length = s_bytes.len();
         let length_bytes = length.to_le_bytes();
@@ -112,15 +118,19 @@ pub trait SamSerializable {
         };
 
         let message = String::from_utf8_lossy(&buffer);
-        let message: Self = serde_json::from_str(&message).expect("Failed to deserialize message");
+        let message: Self = match serde_json::from_str(&message) {
+            Ok(msg) => msg,
+            Err(e) => {
+                eprintln!("[IPC] Failed to deserialize message: {e}");
+                return Err(SamError::SerializationFailed);
+            }
+        };
         Ok(message)
     }
 }
 
-
 impl<T> SamSerializable for SteamResponse<T> where T: Sized + Serialize {}
 impl SamSerializable for SteamCommand {}
-
 
 impl<T> Into<Result<T, SamError>> for SteamResponse<T> {
     fn into(self) -> Result<T, SamError> {

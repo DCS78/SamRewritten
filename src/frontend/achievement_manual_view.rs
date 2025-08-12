@@ -26,15 +26,21 @@ use crate::{
     utils::format::format_seconds_to_mm_ss,
 };
 use gtk::{
+    Adjustment, Align, Box, Button, ClosureExpression, Frame, Label, ListBox, ListBoxRow, ListItem,
+    ListView, NoSelection, Orientation, Overlay, ScrolledWindow, SelectionMode,
+    SignalListItemFactory, SpinButton, Stack, StackTransitionType, Switch, Widget,
     gio::{ListStore, spawn_blocking},
     glib::{self, MainContext, SignalHandlerId, clone, translate::FromGlib},
     pango::EllipsizeMode,
     prelude::*,
-    Adjustment, Align, Box, Button, ClosureExpression, Frame, Label, ListBox, ListBoxRow, ListItem,
-    ListView, NoSelection, Orientation, Overlay, ScrolledWindow, SelectionMode,
-    SignalListItemFactory, SpinButton, Stack, StackTransitionType, Switch, Widget
 };
-use std::{cell::Cell, cmp::Ordering, ffi::c_ulong, rc::Rc, sync::{Arc, atomic::AtomicBool}};
+use std::{
+    cell::Cell,
+    cmp::Ordering,
+    ffi::c_ulong,
+    rc::Rc,
+    sync::{Arc, atomic::AtomicBool},
+};
 
 #[inline]
 fn create_header(
@@ -53,12 +59,29 @@ fn create_header(
     let label_achievements_over = Label::new(Some("unlocked over"));
     let label_achievements_minutes = Label::new(Some("minutes"));
 
-    let adjustment_achievements_count = Adjustment::builder().lower(0.0).upper(i32::MAX as f64).step_increment(1.0).build();
-    let spin_button_achievements_count = SpinButton::builder().adjustment(&adjustment_achievements_count).digits(0).build();
-    let adjustment_minutes_count = Adjustment::builder().lower(0.0).upper(i32::MAX as f64).step_increment(1.0).build();
-    let spin_button_minutes_count = SpinButton::builder().adjustment(&adjustment_minutes_count).digits(0).build();
+    let adjustment_achievements_count = Adjustment::builder()
+        .lower(0.0)
+        .upper(i32::MAX as f64)
+        .step_increment(1.0)
+        .build();
+    let spin_button_achievements_count = SpinButton::builder()
+        .adjustment(&adjustment_achievements_count)
+        .digits(0)
+        .build();
+    let adjustment_minutes_count = Adjustment::builder()
+        .lower(0.0)
+        .upper(i32::MAX as f64)
+        .step_increment(1.0)
+        .build();
+    let spin_button_minutes_count = SpinButton::builder()
+        .adjustment(&adjustment_minutes_count)
+        .digits(0)
+        .build();
 
-    let spacer = Box::builder().orientation(Orientation::Horizontal).hexpand(true).build();
+    let spacer = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .hexpand(true)
+        .build();
     let button_start = Button::builder().label("Start").build();
     let cancelled_task = Arc::new(AtomicBool::new(false));
 
@@ -273,159 +296,159 @@ pub fn create_achievements_manual_view(
         }
     });
 
-/// Helper to setup a list item row for the manual achievements view.
-fn setup_achievement_manual_list_item(list_item: &gtk::ListItem) {
-    let normal_icon = ShimmerImage::new();
-    normal_icon.set_size_request(32, 32);
-    let locked_icon = ShimmerImage::new();
-    locked_icon.set_size_request(32, 32);
+    /// Helper to setup a list item row for the manual achievements view.
+    fn setup_achievement_manual_list_item(list_item: &gtk::ListItem) {
+        let normal_icon = ShimmerImage::new();
+        normal_icon.set_size_request(32, 32);
+        let locked_icon = ShimmerImage::new();
+        locked_icon.set_size_request(32, 32);
 
-    let icon_stack = Stack::builder()
-        .transition_type(StackTransitionType::RotateLeftRight)
-        .build();
-    icon_stack.add_named(&normal_icon, Some("normal"));
-    icon_stack.add_named(&locked_icon, Some("locked"));
+        let icon_stack = Stack::builder()
+            .transition_type(StackTransitionType::RotateLeftRight)
+            .build();
+        icon_stack.add_named(&normal_icon, Some("normal"));
+        icon_stack.add_named(&locked_icon, Some("locked"));
 
-    let icon_box = Box::builder()
-        .orientation(Orientation::Vertical)
-        .halign(Align::Start)
-        .margin_end(8)
-        .build();
-    icon_box.append(&icon_stack);
+        let icon_box = Box::builder()
+            .orientation(Orientation::Vertical)
+            .halign(Align::Start)
+            .margin_end(8)
+            .build();
+        icon_box.append(&icon_stack);
 
-    let protected_icon = gtk::Image::from_icon_name("action-unavailable-symbolic");
-    protected_icon.set_margin_end(8);
-    protected_icon.set_tooltip_text(Some("This achievement is protected."));
+        let protected_icon = gtk::Image::from_icon_name("action-unavailable-symbolic");
+        protected_icon.set_margin_end(8);
+        protected_icon.set_tooltip_text(Some("This achievement is protected."));
 
-    let switch = Switch::builder().valign(Align::Center).build();
+        let switch = Switch::builder().valign(Align::Center).build();
 
-    let switch_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .valign(Align::Start)
-        .build();
-    switch_box.append(&protected_icon);
-    switch_box.append(&switch);
+        let switch_box = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .valign(Align::Start)
+            .build();
+        switch_box.append(&protected_icon);
+        switch_box.append(&switch);
 
-    let spacer = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .hexpand(true)
-        .build();
-    let name_label = Label::builder()
-        .ellipsize(EllipsizeMode::End)
-        .halign(Align::Start)
-        .build();
-    let description_label = Label::builder()
-        .ellipsize(EllipsizeMode::End)
-        .halign(Align::Start)
-        .build();
-    let label_box = Box::builder().orientation(Orientation::Vertical).build();
-    let global_percentage_progress_bar = CustomProgressBar::new();
-    label_box.append(&name_label);
-    label_box.append(&description_label);
-    let achievement_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(8)
-        .margin_bottom(8)
-        .margin_start(8)
-        .margin_end(8)
-        .build();
-    achievement_box.append(&icon_box);
-    achievement_box.append(&label_box);
-    achievement_box.append(&spacer);
-    achievement_box.append(&switch_box);
+        let spacer = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .hexpand(true)
+            .build();
+        let name_label = Label::builder()
+            .ellipsize(EllipsizeMode::End)
+            .halign(Align::Start)
+            .build();
+        let description_label = Label::builder()
+            .ellipsize(EllipsizeMode::End)
+            .halign(Align::Start)
+            .build();
+        let label_box = Box::builder().orientation(Orientation::Vertical).build();
+        let global_percentage_progress_bar = CustomProgressBar::new();
+        label_box.append(&name_label);
+        label_box.append(&description_label);
+        let achievement_box = Box::builder()
+            .orientation(Orientation::Horizontal)
+            .margin_top(8)
+            .margin_bottom(8)
+            .margin_start(8)
+            .margin_end(8)
+            .build();
+        achievement_box.append(&icon_box);
+        achievement_box.append(&label_box);
+        achievement_box.append(&spacer);
+        achievement_box.append(&switch_box);
 
-    let overlay = Overlay::builder()
-        .child(&global_percentage_progress_bar)
-        .build();
-    overlay.add_overlay(&achievement_box);
-    overlay.set_measure_overlay(&achievement_box, true);
-    let list_item = list_item
-        .downcast_ref::<gtk::ListItem>()
-        .expect("list_item must be a ListItem");
-    list_item.set_child(Some(&overlay));
+        let overlay = Overlay::builder()
+            .child(&global_percentage_progress_bar)
+            .build();
+        overlay.add_overlay(&achievement_box);
+        overlay.set_measure_overlay(&achievement_box, true);
+        let list_item = list_item
+            .downcast_ref::<gtk::ListItem>()
+            .expect("list_item must be a ListItem");
+        list_item.set_child(Some(&overlay));
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("name")
-        .bind(&name_label, "label", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("name")
+            .bind(&name_label, "label", Widget::NONE);
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("description")
-        .bind(&description_label, "label", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("description")
+            .bind(&description_label, "label", Widget::NONE);
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("icon-normal")
-        .bind(&normal_icon, "url", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("icon-normal")
+            .bind(&normal_icon, "url", Widget::NONE);
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("icon-locked")
-        .bind(&locked_icon, "url", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("icon-locked")
+            .bind(&locked_icon, "url", Widget::NONE);
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("is-achieved")
-        .bind(&switch, "active", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("is-achieved")
+            .bind(&switch, "active", Widget::NONE);
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("global-achieved-percent")
-        .bind(&global_percentage_progress_bar, "value", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("global-achieved-percent")
+            .bind(&global_percentage_progress_bar, "value", Widget::NONE);
 
-    list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("global-achieved-percent-ok")
-        .bind(&global_percentage_progress_bar, "visible", Widget::NONE);
+        list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("global-achieved-percent-ok")
+            .bind(&global_percentage_progress_bar, "visible", Widget::NONE);
 
-    // Custom expressions
-    let is_achieved_expr = list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("is-achieved");
-    let permission_expr = list_item
-        .property_expression("item")
-        .chain_property::<GAchievementObject>("permission");
+        // Custom expressions
+        let is_achieved_expr = list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("is-achieved");
+        let permission_expr = list_item
+            .property_expression("item")
+            .chain_property::<GAchievementObject>("permission");
 
-    let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-        let is_achieved = values
-            .get(1)
-            .and_then(|val| val.get::<bool>().ok())
-            .unwrap_or(false);
-        let child_name = if is_achieved { "normal" } else { "locked" };
-        Some(child_name.to_value())
-    });
+        let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+            let is_achieved = values
+                .get(1)
+                .and_then(|val| val.get::<bool>().ok())
+                .unwrap_or(false);
+            let child_name = if is_achieved { "normal" } else { "locked" };
+            Some(child_name.to_value())
+        });
 
-    let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-        let permission = values
-            .get(1)
-            .and_then(|val| val.get::<i32>().ok())
-            .unwrap_or(0);
-        let is_sensitive = (permission & 2) == 0;
-        Some(is_sensitive.to_value())
-    });
-    let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-        let permission = values
-            .get(1)
-            .and_then(|val| val.get::<i32>().ok())
-            .unwrap_or(0);
-        let is_protected = (permission & 2) != 0;
-        Some(is_protected.to_value())
-    });
+        let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+            let permission = values
+                .get(1)
+                .and_then(|val| val.get::<i32>().ok())
+                .unwrap_or(0);
+            let is_sensitive = (permission & 2) == 0;
+            Some(is_sensitive.to_value())
+        });
+        let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+            let permission = values
+                .get(1)
+                .and_then(|val| val.get::<i32>().ok())
+                .unwrap_or(0);
+            let is_protected = (permission & 2) != 0;
+            Some(is_protected.to_value())
+        });
 
-    let visible_child_expr =
-        ClosureExpression::new::<String>(&[is_achieved_expr], achieved_visible_icon_closure);
-    let permission_sensitive_expr = ClosureExpression::new::<bool>(
-        &[permission_expr.clone()],
-        permission_sensitive_closure,
-    );
-    let permission_protected_expr =
-        ClosureExpression::new::<bool>(&[permission_expr], permission_protected_closure);
+        let visible_child_expr =
+            ClosureExpression::new::<String>(&[is_achieved_expr], achieved_visible_icon_closure);
+        let permission_sensitive_expr = ClosureExpression::new::<bool>(
+            &[permission_expr.clone()],
+            permission_sensitive_closure,
+        );
+        let permission_protected_expr =
+            ClosureExpression::new::<bool>(&[permission_expr], permission_protected_closure);
 
-    visible_child_expr.bind(&icon_stack, "visible-child-name", Widget::NONE);
-    permission_sensitive_expr.bind(&switch, "sensitive", Widget::NONE);
-    permission_protected_expr.bind(&protected_icon, "visible", Widget::NONE);
-}
+        visible_child_expr.bind(&icon_stack, "visible-child-name", Widget::NONE);
+        permission_sensitive_expr.bind(&switch, "sensitive", Widget::NONE);
+        permission_protected_expr.bind(&protected_icon, "visible", Widget::NONE);
+    }
 
     achievements_list_factory.connect_bind(clone!(
         #[strong]

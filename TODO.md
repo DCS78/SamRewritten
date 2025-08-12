@@ -10,7 +10,6 @@ This is a living list of tasks and ideas for improving SamRewritten. Contributio
 ## Low Priority
 
 - [ ] Show achievement progression when available
-- [ ] Improve error handling (handle `.expect`, `.unwrap`, etc.)
 
 ## Nice to Have
 
