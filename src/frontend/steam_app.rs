@@ -43,7 +43,16 @@ impl GSteamAppObject {
             .property("app_name", app.app_name)
             .property("developer", app.developer)
             .property("image_url", image_url)
-            .property("metacritic_score", app.metacritic_score.unwrap_or(u8::MAX))
+            .property(
+                "metacritic_score",
+                match app.metacritic_score {
+                    Some(score) => score,
+                    _ => {
+                        log::warn!("App {} missing metacritic_score, using u8::MAX", app.app_id);
+                        u8::MAX
+                    }
+                },
+            )
             .property("app_type", format!("{:?}", app.app_type))
             .build()
     }

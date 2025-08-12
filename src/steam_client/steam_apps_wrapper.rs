@@ -16,6 +16,7 @@
 //! Provides a safe Rust abstraction over the `ISteamApps` FFI interface.
 use crate::steam_client::steam_apps_vtable::ISteamApps;
 use crate::steam_client::wrapper_types::SteamClientError;
+use log;
 use std::sync::Arc;
 
 /// Safe wrapper for the `ISteamApps` interface.

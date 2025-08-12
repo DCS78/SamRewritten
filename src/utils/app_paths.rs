@@ -30,14 +30,31 @@ pub fn get_app_cache_dir() -> Result<String, SamError> {
     use std::fs;
     if let Ok(snap_name) = env::var("SNAP_NAME") {
         if snap_name == "samrewritten" {
-            return Ok(env::var("SNAP_USER_COMMON").unwrap_or_else(|_| String::from("/tmp")));
+            let snap_user_common = match env::var("SNAP_USER_COMMON") {
+                Ok(val) => val,
+                Err(e) => {
+                    log::warn!("SNAP_USER_COMMON not set: {e}, using /tmp");
+                    String::from("/tmp")
+                }
+            };
+            return Ok(snap_user_common);
         }
         // Most likely a dev config
         return Ok(".".to_owned());
     }
     // Non-snap release
-    let folder = env::var("HOME").unwrap_or_else(|_| "/tmp".to_owned()) + "/.cache/samrewritten";
-    fs::create_dir_all(&folder).map_err(|_| SamError::UnknownError)?;
+    let home = match env::var("HOME") {
+        Ok(val) => val,
+        Err(e) => {
+            log::warn!("HOME not set: {e}, using /tmp");
+            "/tmp".to_owned()
+        }
+    };
+    let folder = home + "/.cache/samrewritten";
+    fs::create_dir_all(&folder).map_err(|e| {
+        log::error!("Failed to create app cache dir {folder}: {e}");
+        SamError::UnknownError
+    })?;
     Ok(folder)
 }
 

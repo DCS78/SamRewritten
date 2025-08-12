@@ -64,14 +64,29 @@ pub fn create_achievements_view(
         .build();
 
     let global_achieved_percent_sorter = CustomSorter::new(|obj1, obj2| {
-        let achievement1 = obj1.downcast_ref::<GAchievementObject>().unwrap();
-        let achievement2 = obj2.downcast_ref::<GAchievementObject>().unwrap();
+        let achievement1 = match obj1.downcast_ref::<GAchievementObject>() {
+            Some(a) => a,
+            _ => {
+                log::error!("obj1 is not a GAchievementObject in global_achieved_percent_sorter");
+                return Ordering::Equal.into();
+            }
+        };
+        let achievement2 = match obj2.downcast_ref::<GAchievementObject>() {
+            Some(a) => a,
+            _ => {
+                log::error!("obj2 is not a GAchievementObject in global_achieved_percent_sorter");
+                return Ordering::Equal.into();
+            }
+        };
         let percent1 = achievement1.global_achieved_percent();
         let percent2 = achievement2.global_achieved_percent();
-        percent2
-            .partial_cmp(&percent1)
-            .unwrap_or(Ordering::Equal)
-            .into()
+        match percent2.partial_cmp(&percent1) {
+            Some(ordering) => ordering.into(),
+            none => {
+                log::warn!("partial_cmp returned None in global_achieved_percent_sorter");
+                Ordering::Equal.into()
+            }
+        }
     });
     let app_achievement_sort_model = SortListModel::builder()
         .model(&app_achievement_filter_model)

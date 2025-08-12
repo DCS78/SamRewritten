@@ -53,7 +53,13 @@ fn main() -> glib::ExitCode {
         return ExitCode::from(exit_code as u8);
     }
 
-    let current_exe = get_executable_path();
+    let current_exe = match get_executable_path() {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Failed to get executable path: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     let orchestrator = match BidirChild::new(Command::new(current_exe).arg("--orchestrator")) {
         Ok(child) => child,
         Err(e) => {

@@ -27,12 +27,21 @@ pub trait Request: Into<SteamCommand> + Debug + Clone {
     type Response: DeserializeOwned;
 
     fn request(self) -> Result<Self::Response, SamError> {
-        let mut guard = DEFAULT_PROCESS.write().unwrap();
+        let mut guard = match DEFAULT_PROCESS.write() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("[CLIENT] Failed to lock DEFAULT_PROCESS: {e}");
+                return Err(SamError::SocketCommunicationFailed);
+            }
+        };
         if let Some(ref mut bidir) = *guard {
             let command: SteamCommand = self.clone().into();
             dev_println!("[CLIENT] Sending command: {:?}", command);
             let command = command.sam_serialize();
-            bidir.tx.write_all(&command).unwrap();
+            if let Err(e) = bidir.tx.write_all(&command) {
+                eprintln!("[CLIENT] Error writing command to pipe: {e}");
+                return Err(SamError::SocketCommunicationFailed);
+            }
 
             let mut buffer_len = [0u8; std::mem::size_of::<usize>()];
             match bidir.rx.read_exact(&mut buffer_len) {

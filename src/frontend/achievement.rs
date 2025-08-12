@@ -25,7 +25,13 @@ glib::wrapper! {
 impl GAchievementObject {
     /// Create a new GAchievementObject from AchievementInfo.
     pub fn new(info: AchievementInfo) -> Self {
-        let global_achieved_percent = info.global_achieved_percent.unwrap_or(0.0);
+        let global_achieved_percent = match info.global_achieved_percent {
+            Some(val) => val,
+            none => {
+                log::warn!("global_achieved_percent is None, using 0.0 as default");
+                0.0
+            }
+        };
         let global_achieved_percent_ok = info.global_achieved_percent.is_some();
 
         Object::builder()

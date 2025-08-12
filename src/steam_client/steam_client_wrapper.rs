@@ -30,6 +30,7 @@ use crate::steam_client::steamworks_types::{
 };
 use crate::steam_client::wrapper_types::SteamClientError;
 use libloading::Symbol;
+use log;
 use std::os::raw::c_char;
 use std::sync::Arc;
 

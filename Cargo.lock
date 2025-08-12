@@ -10,6 +10,7 @@ dependencies = [
  "interprocess",
  "libadwaita",
  "libloading",
+ "log",
  "once_cell",
  "quick-xml",
  "reqwest",

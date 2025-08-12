@@ -64,9 +64,12 @@ impl ConnectedSteam {
     /// Cleanly shut down the Steam connection and release resources.
     pub fn shutdown(&self) {
         self.client.release_user(self.h_pipe, self.h_user);
-        self.client
-            .release_steam_pipe(self.h_pipe)
-            .expect("Failed to release steam pipe");
+            match self.client.release_steam_pipe(self.h_pipe) {
+                Ok(_) => {},
+                Err(e) => {
+                    eprintln!("Failed to release steam pipe: {e}");
+                }
+            }
         let _ = self.client.shutdown_if_app_pipes_closed();
     }
 }

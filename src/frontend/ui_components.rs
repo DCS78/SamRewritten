@@ -52,9 +52,25 @@ pub fn load_logo() -> Paintable {
         Texture::for_pixbuf(&logo_pixbuf).into()
     } else {
         eprintln!("[CLIENT] Failed to load logo. Using a gray square.");
-        let pixbuf = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1)
-            .expect("Failed to create minimal pixbuf fallback");
-        pixbuf.fill(0x808080FF);
+        let pixbuf = match Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1) {
+            Some(p) => {
+                let mut p = p;
+                p.fill(0x808080FF);
+                p
+            },
+            none => {
+                eprintln!("[CLIENT] Failed to create minimal pixbuf fallback. Returning truly empty texture.");
+                // Return a 1x1 transparent pixbuf or a default Paintable if all else fails
+                return gtk::gdk::Texture::for_pixbuf(&match Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1) {
+                    Some(p) => p,
+                    none => {
+                        eprintln!("[CLIENT] Pixbuf::new failed again. Returning default Paintable.");
+                        // Return a default Paintable (empty texture)
+                        return gtk::gdk::Texture::for_pixbuf(&Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1).unwrap_or_else(|| unsafe { std::mem::zeroed() })).into();
+                    }
+                }).into();
+            }
+        };
         Texture::for_pixbuf(&pixbuf).into()
     }
 }

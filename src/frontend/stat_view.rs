@@ -26,6 +26,7 @@ use gtk::{
     prelude::*,
 };
 use std::{cell::RefCell, ffi::c_ulong, sync::mpsc::channel, time::Duration};
+use log;
 
 /// Create the stats view, including model, filter, and UI.
 pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
@@ -101,156 +102,180 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             .downcast_ref::<gtk::ListItem>();
         if let Some(list_item) = list_item {
             list_item.set_child(Some(&stat_box));
+
+            // All property_expression and binding code must be inside this block
+            // Expression bindings
+            list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("display-name")
+                .bind(&name_label, "label", Widget::NONE);
+
+            list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("current-value")
+                .bind(&adjustment, "value", Widget::NONE);
+
+            list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("is-increment-only")
+                .bind(&icon_increment_only, "visible", Widget::NONE);
+
+            // Custom expressions
+            let is_integer_expr = list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("is-integer");
+
+            let is_integer_expr_2 = list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("is-integer");
+
+            let is_increment_only_expr = list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("is-increment-only");
+
+            let original_value_expr = list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("original-value");
+
+            let permission_expr = list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("permission");
+
+            let permission_expr_2 = list_item
+                .property_expression("item")
+                .chain_property::<GStatObject>("permission");
+
+            let adjustment_step_increment_closure =
+                glib::RustClosure::new(|values: &[glib::Value]| {
+                    let is_integer = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
+                        Some(val) => val,
+                        none => {
+                            log::warn!("Failed to get is_integer as bool in adjustment_step_increment_closure");
+                            false
+                        }
+                    };
+                    let step_increment = if is_integer { 1.0 } else { 0.01 };
+                    Some(step_increment.to_value())
+                });
+
+            let adjustment_lower_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+                let original_value = match values.get(1).and_then(|val| val.get::<f64>().ok()) {
+                    Some(val) => val,
+                    none => {
+                        log::warn!("Failed to get original_value as f64 in adjustment_lower_closure");
+                        0f64
+                    }
+                };
+                let is_increment_only = match values.get(2).and_then(|val| val.get::<bool>().ok()) {
+                    Some(val) => val,
+                    none => {
+                        log::warn!("Failed to get is_increment_only as bool in adjustment_lower_closure");
+                        false
+                    }
+                };
+                let lower = if is_increment_only {
+                    original_value
+                } else {
+                    i32::MIN as f64
+                };
+                Some(lower.to_value())
+            });
+
+            let spin_button_digits_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+                let is_integer = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
+                    Some(val) => val,
+                    none => {
+                        log::warn!("Failed to get is_integer as bool in spin_button_digits_closure");
+                        false
+                    }
+                };
+                let digits: u32 = if is_integer { 0 } else { 2 };
+                Some(digits.to_value())
+            });
+
+            let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+                let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
+                    Some(val) => val,
+                    none => {
+                        log::warn!("Failed to get permission as i32 in permission_sensitive_closure");
+                        0
+                    }
+                };
+                let is_sensitive = (permission & 2) == 0;
+                Some(is_sensitive.to_value())
+            });
+
+            let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+                let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
+                    Some(val) => val,
+                    none => {
+                        log::warn!("Failed to get permission as i32 in permission_protected_closure");
+                        0
+                    }
+                };
+                let is_protected = (permission & 2) != 0;
+                Some(is_protected.to_value())
+            });
+
+            let adjustment_step_increment_expression =
+                ClosureExpression::new::<f64>(&[is_integer_expr], adjustment_step_increment_closure);
+            adjustment_step_increment_expression.bind(&adjustment, "step-increment", Widget::NONE);
+
+            let adjustment_lower_expression = ClosureExpression::new::<f64>(
+                &[original_value_expr, is_increment_only_expr],
+                adjustment_lower_closure,
+            );
+            adjustment_lower_expression.bind(&adjustment, "lower", Widget::NONE);
+
+            let spin_button_digits_expression =
+                ClosureExpression::new::<u32>(&[is_integer_expr_2], spin_button_digits_closure);
+            spin_button_digits_expression.bind(&spin_button, "digits", Widget::NONE);
+
+            let permission_sensitive_expr =
+                ClosureExpression::new::<bool>(&[permission_expr], permission_sensitive_closure);
+            permission_sensitive_expr.bind(&spin_button, "sensitive", Widget::NONE);
+
+            let permission_protected_expr =
+                ClosureExpression::new::<bool>(&[permission_expr_2], permission_protected_closure);
+            permission_protected_expr.bind(&protected_icon, "visible", Widget::NONE);
         } else {
             log::error!("list_item was not a ListItem; skipping child set");
         }
 
-        // Expression bindings
-        list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("display-name")
-            .bind(&name_label, "label", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("current-value")
-            .bind(&adjustment, "value", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("is-increment-only")
-            .bind(&icon_increment_only, "visible", Widget::NONE);
-
-        // Custom expressions
-        let is_integer_expr = list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("is-integer");
-
-        let is_integer_expr_2 = list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("is-integer");
-
-        let is_increment_only_expr = list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("is-increment-only");
-
-        let original_value_expr = list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("original-value");
-
-        let permission_expr = list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("permission");
-
-        let permission_expr_2 = list_item
-            .property_expression("item")
-            .chain_property::<GStatObject>("permission");
-
-        let adjustment_step_increment_closure =
-            glib::RustClosure::new(|values: &[glib::Value]| {
-                let is_integer = values
-                    .get(1)
-                    .and_then(|val| val.get::<bool>().ok())
-                    .unwrap_or(false); // fallback to false if error
-                let step_increment = if is_integer { 1.0 } else { 0.01 };
-                Some(step_increment.to_value())
-            });
-
-        let adjustment_lower_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let original_value = values
-                .get(1)
-                .and_then(|val| val.get::<f64>().ok())
-                .unwrap_or(0f64); // fallback to 0.0 if error
-            let is_increment_only = values
-                .get(2)
-                .and_then(|val| val.get::<bool>().ok())
-                .unwrap_or(false); // fallback to false if error
-
-            let lower = if is_increment_only {
-                original_value
-            } else {
-                i32::MIN as f64
-            };
-            Some(lower.to_value())
-        });
-
-        let spin_button_digits_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let is_integer = values
-                .get(1)
-                .and_then(|val| val.get::<bool>().ok())
-                .unwrap_or(false); // fallback to false if error
-            let digits: u32 = if is_integer { 0 } else { 2 };
-            Some(digits.to_value())
-        });
-
-        let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let permission = values
-                .get(1)
-                .and_then(|val| val.get::<i32>().ok())
-                .unwrap_or(0); // fallback to 0 if error
-            let is_sensitive = (permission & 2) == 0;
-            Some(is_sensitive.to_value())
-        });
-
-        let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let permission = values
-                .get(1)
-                .and_then(|val| val.get::<i32>().ok())
-                .unwrap_or(0); // fallback to 0 if error
-            let is_protected = (permission & 2) != 0;
-            Some(is_protected.to_value())
-        });
-
-        let adjustment_step_increment_expression =
-            ClosureExpression::new::<f64>(&[is_integer_expr], adjustment_step_increment_closure);
-        adjustment_step_increment_expression.bind(&adjustment, "step-increment", Widget::NONE);
-
-        let adjustment_lower_expression = ClosureExpression::new::<f64>(
-            &[original_value_expr, is_increment_only_expr],
-            adjustment_lower_closure,
-        );
-        adjustment_lower_expression.bind(&adjustment, "lower", Widget::NONE);
-
-        let spin_button_digits_expression =
-            ClosureExpression::new::<u32>(&[is_integer_expr_2], spin_button_digits_closure);
-        spin_button_digits_expression.bind(&spin_button, "digits", Widget::NONE);
-
-        let permission_sensitive_expr =
-            ClosureExpression::new::<bool>(&[permission_expr], permission_sensitive_closure);
-        permission_sensitive_expr.bind(&spin_button, "sensitive", Widget::NONE);
-
-        let permission_protected_expr =
-            ClosureExpression::new::<bool>(&[permission_expr_2], permission_protected_closure);
-        permission_protected_expr.bind(&protected_icon, "visible", Widget::NONE);
+    // All property_expression and binding code is now inside the if let block above.
+    // (Redundant closure code removed; all logic is now handled above with logging.)
     });
 
     stats_list_factory.connect_bind(move |_, list_item| unsafe {
-        let list_item = list_item.downcast_ref::<ListItem>();
-        if list_item.is_none() {
-            log::error!("ListItem cast failed in bind");
-            return;
-        }
-        let list_item = list_item.unwrap();
-        let stat_object = list_item
+        let list_item = match list_item.downcast_ref::<ListItem>() {
+            Some(li) => li,
+            _ => {
+                log::error!("ListItem cast failed in bind");
+                return;
+            }
+        };
+        let stat_object = match list_item
             .item()
-            .and_then(|item| item.downcast::<GStatObject>().ok());
-        if stat_object.is_none() {
-            log::error!("Item was not a GStatObject");
-            return;
-        }
-        let stat_object = stat_object.unwrap();
-        let spin_button = list_item
+            .and_then(|item| item.downcast::<GStatObject>().ok()) {
+            Some(so) => so,
+            _ => {
+                log::error!("Item was not a GStatObject");
+                return;
+            }
+        };
+        let spin_button = match list_item
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
             .and_then(|stat_box| stat_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok())
             .and_then(|button_box| button_box.last_child())
-            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok());
-        if spin_button.is_none() {
-            log::error!("Could not find SpinButton widget");
-            return;
-        }
-        let spin_button = spin_button.unwrap();
+            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok()) {
+            Some(sb) => sb,
+            _ => {
+                log::error!("Could not find SpinButton widget");
+                return;
+            }
+        };
 
         let sender = RefCell::new(channel::<f64>().0);
 
@@ -299,7 +324,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                     match join_handle.await {
                         Ok((success, debounced_value)) => (success, debounced_value),
                         Err(e) => {
-                            log::error!("spawn_blocking task panicked: {e}");
+                            log::error!("spawn_blocking task panicked: {:?}", e);
                             (false, value)
                         }
                     };
@@ -316,24 +341,26 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
     });
 
     stats_list_factory.connect_unbind(move |_, list_item| unsafe {
-        let list_item = list_item.downcast_ref::<ListItem>();
-        if list_item.is_none() {
-            log::error!("ListItem cast failed in unbind");
-            return;
-        }
-        let list_item = list_item.unwrap();
-        let spin_button = list_item
+        let list_item = match list_item.downcast_ref::<ListItem>() {
+            Some(li) => li,
+            _ => {
+                log::error!("ListItem cast failed in unbind");
+                return;
+            }
+        };
+        let spin_button = match list_item
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
             .and_then(|stat_box| stat_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok())
             .and_then(|button_box| button_box.last_child())
-            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok());
-        if spin_button.is_none() {
-            log::error!("Could not find SpinButton widget");
-            return;
-        }
-        let spin_button = spin_button.unwrap();
+            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok()) {
+            Some(sb) => sb,
+            _ => {
+                log::error!("Could not find SpinButton widget");
+                return;
+            }
+        };
 
         // Disconnect previous handler if it exists
         if let Some(handler_id) = spin_button.data("handler") {

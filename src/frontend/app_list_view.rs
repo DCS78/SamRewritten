@@ -43,6 +43,7 @@ use gtk::{
     glib::{self, ExitCode, MainContext, clone},
     prelude::*,
 };
+use log;
 use std::os::raw::c_ulong;
 use std::process::Command;
 use std::{cell::Cell, rc::Rc};
@@ -315,9 +316,13 @@ pub fn create_main_ui(
         entry.append(&launch_button);
         entry.append(&manage_button_box);
 
-        let list_item = list_item
-            .downcast_ref::<ListItem>()
-            .expect("Needs to be a ListItem");
+        let list_item = match list_item.downcast_ref::<ListItem>() {
+            Some(li) => li,
+            none => {
+                log::error!("Needs to be a ListItem");
+                return;
+            }
+        };
         list_item.set_child(Some(&entry));
         list_item
             .property_expression("item")
@@ -357,13 +362,22 @@ pub fn create_main_ui(
         #[weak]
         app_shimmer_image,
         move |_, list_item| {
-            let list_item = list_item
-                .downcast_ref::<ListItem>()
-                .expect("Needs to be a ListItem");
-            let steam_app_object = list_item
+            let list_item = match list_item.downcast_ref::<ListItem>() {
+                Some(li) => li,
+                None => {
+                    log::error!("Needs to be a ListItem");
+                    return;
+                }
+            };
+            let steam_app_object = match list_item
                 .item()
-                .and_then(|item| item.downcast::<GSteamAppObject>().ok())
-                .expect("Item should be a GSteamAppObject");
+                .and_then(|item| item.downcast::<GSteamAppObject>().ok()) {
+                Some(obj) => obj,
+                none => {
+                    log::error!("Item should be a GSteamAppObject");
+                    return;
+                }
+            };
             let app_id_to_bind = steam_app_object.app_id();
 
             let manage_box = list_item
@@ -372,22 +386,37 @@ pub fn create_main_ui(
                 .and_then(|app_box| app_box.last_child())
                 .and_then(|button_box| button_box.downcast::<Box>().ok());
 
-            let manage_button = manage_box
+            let manage_button = match manage_box
                 .clone()
                 .and_then(|button_box| button_box.first_child())
-                .and_then(|manage_button| manage_button.downcast::<Button>().ok())
-                .expect("Could not find Manage button widget");
+                .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
+                Some(btn) => btn,
+                none => {
+                    log::error!("Could not find Manage button widget");
+                    return;
+                }
+            };
 
-            let manage_button_new_window = manage_box
+            let manage_button_new_window = match manage_box
                 .clone()
                 .and_then(|button_box| button_box.last_child())
-                .and_then(|manage_button| manage_button.downcast::<Button>().ok())
-                .expect("Could not find Manage new window button widget");
+                .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
+                Some(btn) => btn,
+                none => {
+                    log::error!("Could not find Manage new window button widget");
+                    return;
+                }
+            };
 
-            let launch_button = manage_box
+            let launch_button = match manage_box
                 .and_then(|child| child.prev_sibling())
-                .and_then(|launch_button| launch_button.downcast::<Button>().ok())
-                .expect("Could not find Launch button widget");
+                .and_then(|launch_button| launch_button.downcast::<Button>().ok()) {
+                Some(btn) => btn,
+                none => {
+                    log::error!("Could not find Launch button widget");
+                    return;
+                }
+            };
 
             let handler = manage_button.connect_clicked(clone!(
                 #[strong]
@@ -418,10 +447,18 @@ pub fn create_main_ui(
 
             let handler = manage_button_new_window.connect_clicked(move |_| {
                 use crate::get_executable_path;
-                Command::new(get_executable_path())
+                let exe = match get_executable_path() {
+                    Ok(path) => path,
+                    Err(e) => {
+                        log::error!("Failed to get executable path: {e}");
+                        return;
+                    }
+                };
+                if let Err(e) = Command::new(exe)
                     .arg(&format!("--auto-open={app_id_to_bind}"))
-                    .spawn()
-                    .expect("Could not start child process");
+                    .spawn() {
+                    log::error!("Could not start child process: {e}");
+                }
             });
 
             unsafe {
@@ -431,24 +468,36 @@ pub fn create_main_ui(
             let handler = launch_button.connect_clicked(move |_| {
                 #[cfg(unix)]
                 {
-                    Command::new("xdg-open")
+                    match Command::new("xdg-open")
                         .arg(&format!("steam://run/{app_id_to_bind}"))
-                        .spawn()
-                        .expect("Could not start child process")
-                        .wait()
-                        .expect("Failed to wait on child process");
+                        .spawn() {
+                        Ok(mut child) => {
+                            if let Err(e) = child.wait() {
+                                log::error!("Failed to wait on child process: {e}");
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Could not start child process: {e}");
+                        }
+                    }
                 }
 
                 #[cfg(windows)]
                 {
-                    Command::new("cmd")
+                    match Command::new("cmd")
                         .arg("/C")
                         .arg("start")
                         .arg(&format!("steam://run/{app_id_to_bind}"))
-                        .spawn()
-                        .expect("Could not start child process")
-                        .wait()
-                        .expect("Failed to wait on child process");
+                        .spawn() {
+                        Ok(mut child) => {
+                            if let Err(e) = child.wait() {
+                                log::error!("Failed to wait on child process: {e}");
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Could not start child process: {e}");
+                        }
+                    }
                 }
             });
 
@@ -459,9 +508,13 @@ pub fn create_main_ui(
     ));
 
     list_factory.connect_unbind(move |_, list_item| {
-        let list_item = list_item
-            .downcast_ref::<ListItem>()
-            .expect("Needs to be a ListItem");
+        let list_item = match list_item.downcast_ref::<ListItem>() {
+            Some(li) => li,
+            none => {
+                log::error!("Needs to be a ListItem");
+                return;
+            }
+        };
 
         let manage_box = list_item
             .child()
@@ -469,22 +522,37 @@ pub fn create_main_ui(
             .and_then(|app_box| app_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok());
 
-        let manage_button = manage_box
+        let manage_button = match manage_box
             .clone()
             .and_then(|button_box| button_box.first_child())
-            .and_then(|manage_button| manage_button.downcast::<Button>().ok())
-            .expect("Could not find Manage button widget");
+            .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
+            Some(btn) => btn,
+            none => {
+                log::error!("Could not find Manage button widget");
+                return;
+            }
+        };
 
-        let manage_button_new_window = manage_box
+        let manage_button_new_window = match manage_box
             .clone()
             .and_then(|button_box| button_box.last_child())
-            .and_then(|manage_button| manage_button.downcast::<Button>().ok())
-            .expect("Could not find Manage new window button widget");
+            .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
+            Some(btn) => btn,
+            none => {
+                log::error!("Could not find Manage new window button widget");
+                return;
+            }
+        };
 
-        let launch_button = manage_box
+        let launch_button = match manage_box
             .and_then(|child| child.prev_sibling())
-            .and_then(|launch_button| launch_button.downcast::<Button>().ok())
-            .expect("Could not find Launch button widget");
+            .and_then(|launch_button| launch_button.downcast::<Button>().ok()) {
+            Some(btn) => btn,
+            none => {
+                log::error!("Could not find Launch button widget");
+                return;
+            }
+        };
 
         unsafe {
             if let Some(handler) = manage_button.data("handler") {
@@ -744,7 +812,13 @@ pub fn create_main_ui(
             cancel_timed_unlock.store(true, std::sync::atomic::Ordering::Relaxed);
             app_achievements_stack.set_visible_child_name("manual");
 
-            let app_id_copy = app_id.get().unwrap();
+            let app_id_copy = match app_id.get() {
+                Some(id) => id,
+                none => {
+                    log::error!("No App ID for refresh_achievements_list");
+                    return;
+                }
+            };
             let handle = spawn_blocking(move || {
                 let achievements = GetAchievements {
                     app_id: app_id_copy,
@@ -827,7 +901,13 @@ pub fn create_main_ui(
             app_achievements_model.remove_all();
             app_stat_model.remove_all();
 
-            let app_id_copy = app_id.get().unwrap();
+            let app_id_copy = match app_id.get() {
+                Some(id) => id,
+                none => {
+                    log::error!("No App ID for clear_all_stats_and_achievements");
+                    return;
+                }
+            };
             let handle = spawn_blocking(move || {
                 let success = ResetStats {
                     app_id: app_id_copy,
@@ -880,9 +960,13 @@ pub fn create_main_ui(
                     // let mut found_iter = None;
                     for ach in &list_store {
                         if let Ok(obj) = ach {
-                            let g_app = obj
-                                .downcast::<GSteamAppObject>()
-                                .expect("Not a GSteamAppObject");
+                            let g_app = match obj.downcast::<GSteamAppObject>() {
+                                Ok(g_app) => g_app,
+                                Err(_) => {
+                                    log::error!("Not a GSteamAppObject");
+                                    continue;
+                                }
+                            };
                             if g_app.app_id() == auto_launch_app {
                                 // found_iter = Some(g_app);
                                 switch_from_app_list_to_app(

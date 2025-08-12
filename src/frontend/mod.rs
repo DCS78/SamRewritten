@@ -55,15 +55,22 @@ fn shutdown() {
         eprintln!("[CLIENT] Failed to send shutdown message: {}", err);
         return;
     }
-    let mut guard = DEFAULT_PROCESS.write().unwrap();
-    match &mut *guard {
-        Some(bidir) => {
-            bidir
-                .child
-                .wait()
-                .expect("[CLIENT] Failed to wait on orchestrator to shutdown");
+    match DEFAULT_PROCESS.write() {
+        Ok(mut guard) => {
+            match &mut *guard {
+                Some(bidir) => {
+                    if let Err(e) = bidir.child.wait() {
+                        log::error!("[CLIENT] Failed to wait on orchestrator to shutdown: {e}");
+                    }
+                }
+                none => {
+                    log::error!("[CLIENT] No orchestrator process to shutdown");
+                }
+            }
         }
-        none => panic!("[CLIENT] No orchestrator process to shutdown"),
+        Err(e) => {
+            log::error!("[CLIENT] Failed to acquire write lock on DEFAULT_PROCESS: {e}");
+        }
     }
 }
 
@@ -74,7 +81,14 @@ pub type MainApplication = adw::Application;
 
 /// Entry point for the main UI, sets up the application and event loop.
 pub fn main_ui(orchestrator: BidirChild) -> ExitCode {
-    *DEFAULT_PROCESS.write().unwrap() = Some(orchestrator);
+    match DEFAULT_PROCESS.write() {
+        Ok(mut guard) => {
+            *guard = Some(orchestrator);
+        }
+        Err(e) => {
+            log::error!("[CLIENT] Failed to acquire write lock on DEFAULT_PROCESS: {e}");
+        }
+    }
     let main_app = MainApplication::builder()
         .application_id(APP_ID)
         .flags(

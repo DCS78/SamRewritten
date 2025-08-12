@@ -98,8 +98,6 @@ fn create_header(
         #[weak]
         raw_model,
         #[strong]
-        timed_raw_model,
-        #[strong]
         app_id,
         #[weak]
         application,
@@ -111,6 +109,8 @@ fn create_header(
         achievement_views_stack,
         #[weak]
         cancelled_task,
+        #[weak]
+        timed_raw_model,
         move |_| {
             let unlocked_achievements = count_unlocked_achievements(&raw_model) as i32;
             let total_achievements = raw_model.n_items();
@@ -121,9 +121,15 @@ fn create_header(
 
             for achievement in &raw_model {
                 if let Ok(obj) = achievement {
-                    let g_achievement = obj.downcast::<GAchievementObject>().expect("Not a GAchievementObject");
-                    if !g_achievement.is_achieved() && g_achievement.permission() & 2 == 0 {
-                        achievements_to_unlock.push(g_achievement);
+                    match obj.downcast::<GAchievementObject>() {
+                        Ok(g_achievement) => {
+                            if !g_achievement.is_achieved() && g_achievement.permission() & 2 == 0 {
+                                achievements_to_unlock.push(g_achievement);
+                            }
+                        }
+                        Err(_) => {
+                            log::error!("Not a GAchievementObject in auto-unlock loop");
+                        }
                     }
                 }
             }
@@ -131,20 +137,29 @@ fn create_header(
             achievements_to_unlock.sort_by(|a, b| {
                 let percent_a = a.global_achieved_percent();
                 let percent_b = b.global_achieved_percent();
-
-                percent_b.partial_cmp(&percent_a).unwrap_or_else(|| {
-                    if percent_a.is_nan() && percent_b.is_nan() {
-                        Ordering::Equal
-                    } else if percent_a.is_nan() {
-                        Ordering::Greater
-                    } else {
-                        Ordering::Less
+                match percent_b.partial_cmp(&percent_a) {
+                    Some(ordering) => ordering,
+                    none => {
+                        log::warn!("partial_cmp returned None in achievements_to_unlock.sort_by");
+                        if percent_a.is_nan() && percent_b.is_nan() {
+                            Ordering::Equal
+                        } else if percent_a.is_nan() {
+                            Ordering::Greater
+                        } else {
+                            Ordering::Less
+                        }
                     }
-                })
+                }
             });
 
             achievements_to_unlock.truncate(achievements_to_unlock_count);
-            let app_id_int = app_id.get().expect("No App ID?");
+            let app_id_int = match app_id.get() {
+                Some(id) => id,
+                _ => {
+                    log::error!("No App ID?");
+                    return;
+                }
+            };
 
             dev_println!("[CLIENT] Evaluation of automatic unlocking: unlocked: {unlocked_achievements}, total: {total_achievements}, desired: {desired_achievements}");
             if desired_minutes == 0 {
@@ -176,6 +191,8 @@ fn create_header(
             MainContext::default().spawn_local(clone!(
                 #[strong]
                 timed_raw_model,
+                #[strong]
+                cancelled_task,
                 async move {
                     let mut elapsed = 0usize;
                     let need_elapsed = (desired_minutes * 60 * 1000) as usize;
@@ -197,7 +214,9 @@ fn create_header(
                             std::thread::sleep(refresh_rate);
                         });
 
-                        handle.await.expect("Couldn't get handle");
+                        if let Err(e) = handle.await {
+                            log::error!("Couldn't get handle: {:?}", e);
+                        }
 
                         refreshes_without_unlock += 1;
                         if refreshes_without_unlock >= refreshes_per_achievement {
@@ -231,8 +250,7 @@ fn create_header(
             ));
 
             achievement_views_stack.set_visible_child_name("automatic");
-        }
-    ));
+    }));
 
     let list_box_row = ListBoxRow::builder()
         .child(&hbox)
@@ -362,9 +380,13 @@ pub fn create_achievements_manual_view(
             .build();
         overlay.add_overlay(&achievement_box);
         overlay.set_measure_overlay(&achievement_box, true);
-        let list_item = list_item
-            .downcast_ref::<gtk::ListItem>()
-            .expect("list_item must be a ListItem");
+        let list_item = match list_item.downcast_ref::<gtk::ListItem>() {
+            Some(li) => li,
+            _ => {
+                log::error!("list_item must be a ListItem");
+                return;
+            }
+        };
         list_item.set_child(Some(&overlay));
 
         list_item
@@ -411,27 +433,36 @@ pub fn create_achievements_manual_view(
             .chain_property::<GAchievementObject>("permission");
 
         let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let is_achieved = values
-                .get(1)
-                .and_then(|val| val.get::<bool>().ok())
-                .unwrap_or(false);
+            let is_achieved = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
+                Some(val) => val,
+                none => {
+                    log::warn!("Failed to get is_achieved as bool in achieved_visible_icon_closure");
+                    false
+                }
+            };
             let child_name = if is_achieved { "normal" } else { "locked" };
             Some(child_name.to_value())
         });
 
         let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let permission = values
-                .get(1)
-                .and_then(|val| val.get::<i32>().ok())
-                .unwrap_or(0);
+            let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
+                Some(val) => val,
+                none => {
+                    log::warn!("Failed to get permission as i32 in permission_sensitive_closure");
+                    0
+                }
+            };
             let is_sensitive = (permission & 2) == 0;
             Some(is_sensitive.to_value())
         });
         let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let permission = values
-                .get(1)
-                .and_then(|val| val.get::<i32>().ok())
-                .unwrap_or(0);
+            let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
+                Some(val) => val,
+                none => {
+                    log::warn!("Failed to get permission as i32 in permission_protected_closure");
+                    0
+                }
+            };
             let is_protected = (permission & 2) != 0;
             Some(is_protected.to_value())
         });
@@ -466,25 +497,45 @@ pub fn create_achievements_manual_view(
         #[weak]
         header_achievements_start,
         move |_, list_item| unsafe {
-            let list_item = list_item
-                .downcast_ref::<ListItem>()
-                .expect("Needs to be a ListItem");
-            let achievement_object = list_item
+            let list_item = match list_item.downcast_ref::<ListItem>() {
+                Some(li) => li,
+                _ => {
+                    log::error!("Needs to be a ListItem");
+                    return;
+                }
+            };
+            let achievement_object = match list_item
                 .item()
-                .and_then(|item| item.downcast::<GAchievementObject>().ok())
-                .expect("Item should be a GAchievementObject");
+                .and_then(|item| item.downcast::<GAchievementObject>().ok()) {
+                Some(obj) => obj,
+                _ => {
+                    log::error!("Item should be a GAchievementObject");
+                    return;
+                }
+            };
 
-            let switch = list_item
+            let switch = match list_item
                 .child()
                 .and_then(|child| child.downcast::<Overlay>().ok())
                 .and_then(|overlay| overlay.last_child())
                 .and_then(|main_box| main_box.last_child())
                 .and_then(|switch_box| switch_box.downcast::<Box>().ok())
                 .and_then(|switch_box| switch_box.last_child())
-                .and_then(|switch| switch.downcast::<Switch>().ok())
-                .expect("achievements_list_factory::connect_bind: Could not find Switch widget");
+                .and_then(|switch| switch.downcast::<Switch>().ok()) {
+                Some(sw) => sw,
+                _ => {
+                    log::error!("achievements_list_factory::connect_bind: Could not find Switch widget");
+                    return;
+                }
+            };
 
-            let app_id = app_id.get().unwrap_or_default();
+            let app_id = match app_id.get() {
+                Some(id) => id,
+                None => {
+                    log::warn!("app_id is None, using 0 as default");
+                    0
+                }
+            };
             let achievement_id = achievement_object.id().clone();
 
             let handler_id = switch.connect_state_notify(clone!(
@@ -529,38 +580,41 @@ pub fn create_achievements_manual_view(
                         #[weak]
                         header_achievements_start,
                         async move {
-                            if Ok(true) != handle.await.expect("spawn_blocking task panicked") {
-                                achievement_object.set_is_achieved(!unlocked);
-                            } else {
-                                let unlocked_achievements_count_value =
-                                    app_unlocked_achievements_count.get();
+                            match handle.await {
+                                Ok(Ok(true)) => {
+                                    let unlocked_achievements_count_value =
+                                        app_unlocked_achievements_count.get();
 
-                                let new_unlocked_count = if unlocked {
-                                    unlocked_achievements_count_value + 1
-                                } else {
-                                    unlocked_achievements_count_value - 1
-                                };
+                                    let new_unlocked_count = if unlocked {
+                                        unlocked_achievements_count_value + 1
+                                    } else {
+                                        unlocked_achievements_count_value - 1
+                                    };
 
-                                header_achievements_start
-                                    .set_sensitive(new_unlocked_count != raw_model_len as usize);
-                                app_unlocked_achievements_count.set(new_unlocked_count);
+                                    header_achievements_start
+                                        .set_sensitive(new_unlocked_count != raw_model_len as usize);
+                                    app_unlocked_achievements_count.set(new_unlocked_count);
 
-                                app_achievement_count_value
-                                    .set_label(&format!("{new_unlocked_count} / {raw_model_len}"));
+                                    app_achievement_count_value
+                                        .set_label(&format!("{new_unlocked_count} / {raw_model_len}"));
 
-                                let lower =
-                                    std::cmp::min(new_unlocked_count + 1, raw_model_len as usize);
-                                header_achievements_adjustment.set_lower(lower as f64);
+                                    let lower =
+                                        std::cmp::min(new_unlocked_count + 1, raw_model_len as usize);
+                                    header_achievements_adjustment.set_lower(lower as f64);
 
-                                let spinbox_value =
-                                    header_achievements_spinbox.value_as_int() as usize;
-                                let spinbox_value =
-                                    std::cmp::max(spinbox_value, new_unlocked_count + 1);
-                                let spinbox_value =
-                                    std::cmp::min(spinbox_value, raw_model_len as usize);
-                                header_achievements_spinbox.set_value(spinbox_value as f64);
+                                    let spinbox_value =
+                                        header_achievements_spinbox.value_as_int() as usize;
+                                    let spinbox_value =
+                                        std::cmp::max(spinbox_value, new_unlocked_count + 1);
+                                    let spinbox_value =
+                                        std::cmp::min(spinbox_value, raw_model_len as usize);
+                                    header_achievements_spinbox.set_value(spinbox_value as f64);
+                                }
+                                Ok(Ok(false)) | Ok(Err(_)) | Err(_) => {
+                                    log::error!("spawn_blocking task panicked or failed");
+                                    achievement_object.set_is_achieved(!unlocked);
+                                }
                             }
-
                             switch.set_sensitive(true);
                         }
                     ));
@@ -572,19 +626,29 @@ pub fn create_achievements_manual_view(
     ));
 
     achievements_list_factory.connect_unbind(move |_, list_item| unsafe {
-        let list_item = list_item
-            .downcast_ref::<ListItem>()
-            .expect("Needs to be a ListItem");
 
-        let switch = list_item
+        let list_item = match list_item.downcast_ref::<ListItem>() {
+            Some(li) => li,
+            _ => {
+                log::error!("Needs to be a ListItem");
+                return;
+            }
+        };
+
+        let switch = match list_item
             .child()
             .and_then(|child| child.downcast::<Overlay>().ok())
             .and_then(|overlay| overlay.last_child())
             .and_then(|main_box| main_box.last_child())
             .and_then(|switch_box| switch_box.downcast::<Box>().ok())
             .and_then(|switch_box| switch_box.last_child())
-            .and_then(|switch| switch.downcast::<Switch>().ok())
-            .expect("achievements_list_factory::connect_unbind: Could not find Switch widget");
+            .and_then(|switch| switch.downcast::<Switch>().ok()) {
+            Some(sw) => sw,
+            _ => {
+                log::error!("achievements_list_factory::connect_unbind: Could not find Switch widget");
+                return;
+            }
+        };
 
         // Disconnect handler when item is unbound
         if let Some(handler_id) = switch.data("handler") {

@@ -140,7 +140,13 @@ impl KeyValue {
 
     /// Gets a child node by key, or returns a static invalid node if not found.
     pub fn get(&self, key: &str) -> &KeyValue {
-        self.children.get(key).unwrap_or(Self::invalid())
+        match self.children.get(key) {
+            Some(val) => val,
+            none => {
+                // Optionally log here if desired
+                Self::invalid()
+            }
+        }
     }
 
     /// Returns the value as a string, or the provided default if invalid.
@@ -164,7 +170,13 @@ impl KeyValue {
             return default;
         }
         match &self.data {
-            KeyValueData::String(s) => s.parse().unwrap_or(default),
+            KeyValueData::String(s) => match s.parse() {
+                Ok(val) => val,
+                Err(e) => {
+                    eprintln!("KeyValue::as_i32: failed to parse '{}': {}", s, e);
+                    default
+                }
+            },
             KeyValueData::Int32(i) => *i,
             KeyValueData::Float32(f) => *f as i32,
             KeyValueData::UInt64(u) => (*u & 0xFFFFFFFF) as i32,
@@ -178,7 +190,13 @@ impl KeyValue {
             return default;
         }
         match &self.data {
-            KeyValueData::String(s) => s.parse().unwrap_or(default),
+            KeyValueData::String(s) => match s.parse() {
+                Ok(val) => val,
+                Err(e) => {
+                    eprintln!("KeyValue::as_f32: failed to parse '{}': {}", s, e);
+                    default
+                }
+            },
             KeyValueData::Int32(i) => *i as f32,
             KeyValueData::Float32(f) => *f,
             KeyValueData::UInt64(u) => (*u & 0xFFFFFFFF) as f32,
@@ -192,7 +210,13 @@ impl KeyValue {
             return default;
         }
         match &self.data {
-            KeyValueData::String(s) => s.parse::<i32>().map(|v| v != 0).unwrap_or(default),
+            KeyValueData::String(s) => match s.parse::<i32>() {
+                Ok(v) => v != 0,
+                Err(e) => {
+                    eprintln!("KeyValue::as_bool: failed to parse '{}': {}", s, e);
+                    default
+                }
+            },
             KeyValueData::Int32(i) => *i != 0,
             KeyValueData::Float32(f) => *f != 0.0,
             KeyValueData::UInt64(u) => *u != 0,
@@ -296,7 +320,13 @@ impl KeyValue {
 
             let slice = &data[i..i + character_size];
             let s = match encoding {
-                KeyValueEncoding::Utf8 => std::str::from_utf8(slice).unwrap_or(""),
+                KeyValueEncoding::Utf8 => match std::str::from_utf8(slice) {
+                    Ok(val) => val,
+                    Err(e) => {
+                        eprintln!("KeyValue::read_string_internal_dynamic: invalid utf8: {}", e);
+                        ""
+                    }
+                },
             };
 
             if s == character_end {
@@ -311,7 +341,13 @@ impl KeyValue {
         }
 
         match encoding {
-            KeyValueEncoding::Utf8 => Ok(String::from_utf8(data[..i].to_vec()).unwrap_or_default()),
+            KeyValueEncoding::Utf8 => match String::from_utf8(data[..i].to_vec()) {
+                Ok(val) => Ok(val),
+                Err(e) => {
+                    eprintln!("KeyValue::read_string_internal_dynamic: invalid utf8: {}", e);
+                    Ok(String::new())
+                }
+            },
         }
     }
 

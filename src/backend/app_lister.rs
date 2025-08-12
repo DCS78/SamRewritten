@@ -22,6 +22,7 @@ use crate::{
     },
     utils::{app_paths::get_app_cache_dir, ipc_types::SamError},
 };
+use log;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
@@ -104,16 +105,32 @@ struct XmlGames {
 impl<'a> AppLister<'a> {
     /// Create a new AppLister.
     pub fn new(steam_apps_001: &'a SteamApps001, steam_apps: &'a SteamApps) -> Self {
-        let cache_dir = get_app_cache_dir();
-        let app_list_url = std::env::var("APP_LIST_URL")
-            .unwrap_or_else(|_| "https://gib.me/sam/games.xml".to_string());
-        let app_list_local =
-            std::env::var("APP_LIST_LOCAL").unwrap_or_else(|_| "/apps.xml".to_string());
+        let cache_dir = match get_app_cache_dir() {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::error!("Failed to get app cache dir: {e}");
+                String::from("/tmp")
+            }
+        };
+        let app_list_url = match std::env::var("APP_LIST_URL") {
+            Ok(val) => val,
+            Err(_) => {
+                log::warn!("APP_LIST_URL not set, using default");
+                "https://gib.me/sam/games.xml".to_string()
+            }
+        };
+        let app_list_local = match std::env::var("APP_LIST_LOCAL") {
+            Ok(val) => format!("{}{}", cache_dir, val),
+            Err(e) => {
+                log::warn!("Failed to get APP_LIST_LOCAL: {e}, using default");
+                format!("{}{}", cache_dir, "/apps.xml")
+            }
+        };
         let current_language = steam_apps.get_current_game_language();
 
         Self {
             app_list_url,
-            app_list_local: format!("{}{}", cache_dir, app_list_local),
+            app_list_local,
             current_language,
             steam_apps_001,
             steam_apps,
@@ -185,12 +202,16 @@ impl<'a> AppLister<'a> {
     /// Get the image URL for a given app.
     fn get_app_image_url(&self, app_id: &AppId_t) -> Option<String> {
         let try_capsule = |lang| {
-            self.steam_apps_001
-                .get_app_data(
-                    app_id,
-                    &SteamApps001AppDataKeys::SmallCapsule(lang).as_string(),
-                )
-                .unwrap_or_default()
+            match self.steam_apps_001.get_app_data(
+                app_id,
+                &SteamApps001AppDataKeys::SmallCapsule(lang).as_string(),
+            ) {
+                Ok(val) => val,
+                Err(e) => {
+                    log::warn!("Failed to get SmallCapsule for app {}: {e}", app_id);
+                    String::new()
+                }
+            }
         };
         let candidate = try_capsule(&self.current_language);
         if !candidate.is_empty() {
@@ -206,10 +227,15 @@ impl<'a> AppLister<'a> {
                 ));
             }
         }
-        let candidate = self
+        let candidate = match self
             .steam_apps_001
-            .get_app_data(app_id, &SteamApps001AppDataKeys::Logo.as_string())
-            .unwrap_or_default();
+            .get_app_data(app_id, &SteamApps001AppDataKeys::Logo.as_string()) {
+            Ok(val) => val,
+            Err(e) => {
+                log::warn!("Failed to get Logo for app {}: {e}", app_id);
+                String::new()
+            }
+        };
         if !candidate.is_empty() {
             return Some(format!(
                 "https://cdn.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{candidate}.jpg"
@@ -224,11 +250,19 @@ impl<'a> AppLister<'a> {
         let app_name = self
             .steam_apps_001
             .get_app_data(&app_id, &SteamApps001AppDataKeys::Name.as_string())
-            .map_err(|_| SamError::AppListRetrievalFailed)?;
-        let developer = self
+            .map_err(|e| {
+                log::error!("Failed to get app name for {}: {e}", app_id);
+                SamError::AppListRetrievalFailed
+            })?;
+        let developer = match self
             .steam_apps_001
-            .get_app_data(&app_id, &SteamApps001AppDataKeys::Developer.as_string())
-            .unwrap_or_else(|_| "Unknown".to_string());
+            .get_app_data(&app_id, &SteamApps001AppDataKeys::Developer.as_string()) {
+            Ok(val) => val,
+            Err(e) => {
+                log::warn!("Failed to get developer for {}: {e}", app_id);
+                "Unknown".to_string()
+            }
+        };
         let metacritic_score: Option<u8> = self
             .steam_apps_001
             .get_app_data(
@@ -259,11 +293,17 @@ impl<'a> AppLister<'a> {
         let mut models = Vec::new();
         for xml_game in xml_games.games {
             let app_id: AppId_t = xml_game.app_id;
-            if !self.steam_apps.is_subscribed_app(app_id).unwrap_or(false) {
-                continue;
+            match self.steam_apps.is_subscribed_app(app_id) {
+                Ok(true) => {
+                    let app = self.get_app(app_id, &xml_game)?;
+                    models.push(app);
+                }
+                Ok(false) => continue,
+                Err(e) => {
+                    log::warn!("Failed to check is_subscribed_app for {}: {e}", app_id);
+                    continue;
+                }
             }
-            let app = self.get_app(app_id, &xml_game)?;
-            models.push(app);
         }
         Ok(models)
     }

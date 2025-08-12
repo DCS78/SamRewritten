@@ -201,13 +201,14 @@ mod imp {
             let mut split = url.splitn(2, "://");
             let scheme = split.next();
             let rest = split.next();
-            if scheme.is_none() || rest.is_none() {
-                dev_println!("[CLIENT] Invalid URL: {url}");
-                self.failed.set(true);
-                return;
-            }
-            let scheme = scheme.unwrap();
-            let rest = rest.unwrap();
+            let (scheme, rest) = match (scheme, rest) {
+                (Some(scheme), Some(rest)) => (scheme, rest),
+                _ => {
+                    dev_println!("[CLIENT] Invalid URL: {url}");
+                    self.failed.set(true);
+                    return;
+                }
+            };
 
             let (sender, receiver) = sync_channel::<Texture>(0);
             self.receiver.borrow_mut().replace(receiver);
@@ -220,29 +221,45 @@ mod imp {
                     path.push(format!("{}.jpg", base64_encode(url.as_bytes())));
 
                     spawn_blocking(move || {
-                        if !exists(path.as_path()).unwrap_or_default() {
-                            dev_println!("[CLIENT] Downloading: {url}");
-                            //Download and store to path
-                            let response = match Client::new()
-                                .get(url.as_str())
-                                .send()
-                                .and_then(|response| response.error_for_status())
-                                .and_then(|response| response.bytes())
-                            {
-                                Ok(response) => response,
-                                Err(error) => {
-                                    failed.set(true);
-                                    return eprintln!("[CLIENT] Failed to download {url}: {error}");
-                                }
-                            };
+                        let exists_result = std::panic::catch_unwind(|| exists(path.as_path()));
+                        let exists: Result<bool, std::io::Error> = match exists_result {
+                            Ok(val) => val,
+                            Err(_) => {
+                                dev_println!("[CLIENT] Failed to check if file exists for {url}");
+                                Ok(false)
+                            }
+                        };
+                        match exists {
+                            Ok(false) => {
+                                dev_println!("[CLIENT] Downloading: {url}");
+                                //Download and store to path
+                                let response = match Client::new()
+                                    .get(url.as_str())
+                                    .send()
+                                    .and_then(|response| response.error_for_status())
+                                    .and_then(|response| response.bytes())
+                                {
+                                    Ok(response) => response,
+                                    Err(error) => {
+                                        failed.set(true);
+                                        return eprintln!("[CLIENT] Failed to download {url}: {error}");
+                                    }
+                                };
 
-                            if let Err(error) = write(path.as_path(), response) {
+                                if let Err(error) = write(path.as_path(), response) {
+                                    failed.set(true);
+                                    eprintln!("[CLIENT] Failed to write {url} to {path:?}: {error}");
+                                    return;
+                                }
+                            }
+                            Ok(true) => {
+                                dev_println!("[CLIENT] Cached loading: {url}");
+                            }
+                            Err(e) => {
                                 failed.set(true);
-                                eprintln!("[CLIENT] Failed to write {url} to {path:?}: {error}");
+                                eprintln!("[CLIENT] Error checking if file exists for {url}: {e}");
                                 return;
                             }
-                        } else {
-                            dev_println!("[CLIENT] Cached loading: {url}");
                         }
 
                         let data = match std::fs::read(path.as_path()) {

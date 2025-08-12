@@ -193,10 +193,13 @@ fn setup_achievement_list_item(list_item: &gtk::ListItem) {
         .chain_property::<GAchievementObject>("is-achieved");
 
     let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-        let is_achieved = values
-            .get(1)
-            .and_then(|val| val.get::<bool>().ok())
-            .unwrap_or(false);
+        let is_achieved = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
+            Some(val) => val,
+            none => {
+                log::warn!("Failed to get is_achieved as bool in achieved_visible_icon_closure");
+                false
+            }
+        };
         let child_name = if is_achieved { "normal" } else { "locked" };
         Some(child_name.to_value())
     });
