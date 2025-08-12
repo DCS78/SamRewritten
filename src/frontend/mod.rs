@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -75,6 +74,42 @@ pub fn main_ui(orchestrator: BidirChild) -> ExitCode {
         .application_id(APP_ID)
         .flags(gtk::gio::ApplicationFlags::HANDLES_COMMAND_LINE | gtk::gio::ApplicationFlags::NON_UNIQUE)
         .build();
+
+    // Set Adwaita color scheme to match OS theme
+    #[cfg(feature = "adwaita")]
+    {
+        use adw::StyleManager;
+        #[cfg(target_os = "windows")]
+        {
+            // Try to detect Windows dark mode via registry
+            let is_dark = {
+                use std::io::ErrorKind;
+                let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+                let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
+                match hkcu.open_subkey(path) {
+                    Ok(key) => {
+                        // 0 = dark, 1 = light
+                        match key.get_value::<u32, _>("AppsUseLightTheme") {
+                            Ok(val) => val == 0,
+                            Err(_) => false,
+                        }
+                    }
+                    Err(e) if e.kind() == ErrorKind::NotFound => false,
+                    Err(_) => false,
+                }
+            };
+            if is_dark {
+                StyleManager::default().set_color_scheme(adw::ColorScheme::PreferDark);
+            } else {
+                StyleManager::default().set_color_scheme(adw::ColorScheme::PreferLight);
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            StyleManager::default().set_color_scheme(adw::ColorScheme::Default);
+        }
+    }
+
     main_app.connect_command_line(|app, cmd| create_main_ui(app, cmd));
     main_app.connect_shutdown(move |_| shutdown());
     main_app.run()
