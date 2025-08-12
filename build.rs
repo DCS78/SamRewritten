@@ -13,11 +13,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Handles platform-specific build steps, such as embedding Windows resources.
 fn main() {
+    // On Windows, embed the application icon into the executable.
     #[cfg(windows)]
     {
         let mut res = winres::WindowsResource::new();
         res.set_icon("assets/icon.ico");
-        res.compile().unwrap();
+        if let Err(e) = res.compile() {
+            eprintln!("Failed to compile Windows resources: {e}");
+            std::process::exit(1);
+        }
     }
 }

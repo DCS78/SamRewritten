@@ -1,8 +1,12 @@
-# Default ignored files
+# JetBrains IDE project files to ignore
 /shelf/
 /workspace.xml
+
 # Editor-based HTTP Client requests
 /httpRequests/
+
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+
+# Add more patterns below as needed for IDE-specific or user-specific files

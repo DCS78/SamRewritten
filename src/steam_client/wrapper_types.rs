@@ -13,14 +13,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Contains error types and callback IDs for the Steam client wrappers.
+/// Error type for Steam client wrapper operations.
 #[derive(Debug, PartialEq)]
 pub enum SteamClientError {
+    /// The vtable pointer was null.
     NullVtable,
+    /// Failed to create a Steam pipe.
     PipeCreationFailed,
+    /// Failed to release a Steam pipe.
     PipeReleaseFailed,
+    /// Failed to connect to the Steam server.
     UserConnectionFailed,
+    /// Failed to create a Steam interface (with name).
     InterfaceCreationFailed(String),
+    /// The requested app was not found.
     AppNotFound,
+    /// An unknown error occurred.
     UnknownError,
 }
 
@@ -44,9 +53,13 @@ impl std::fmt::Display for SteamClientError {
 
 impl std::error::Error for SteamClientError {}
 
-#[allow(dead_code)]
+/// Enum of Steam callback IDs for wrapper event handling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SteamCallbackId {
+    /// Callback for user stats received.
     UserStatsReceived = 1101,
+    /// Callback for global achievement percentages ready.
     GlobalAchievementPercentagesReady = 1110,
+    /// Callback for global stats received.
     GlobalStatsReceived = 1112,
 }

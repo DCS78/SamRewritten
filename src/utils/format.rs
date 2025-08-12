@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+/// Formats a number of seconds as a MM:SS string.
 #[inline]
 pub fn format_seconds_to_mm_ss(total_seconds: usize) -> String {
     let minutes = total_seconds / 60;
     let seconds = total_seconds % 60;
-
     format!("{:02}:{:02}", minutes, seconds)
 }

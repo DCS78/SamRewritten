@@ -1,21 +1,22 @@
-; Example NSIS script - Prettier Version
-Name SamRewritten
+
+; SamRewritten NSIS Installer Script
+; ----------------------------------
+; Modernized NSIS script for building the SamRewritten Windows installer.
+; Encoding: UTF-8
+
+Name "SamRewritten"
+Outfile "SamRewritten-installer.exe"
+InstallDir "$PROGRAMFILES64\SamRewritten"
+RequestExecutionLevel admin ; Request application privileges
+
+; --- Application Metadata ---
 !define APP_NAME "SamRewritten"
 !define APP_VERSION "1.0.0"
 !define APP_PUBLISHER "Sam Authors"
 !define APP_EXE "samrewritten.exe"
 
-; --- Installer Configuration ---
-Outfile "SamRewritten-installer.exe"
-InstallDir "$PROGRAMFILES64\${APP_NAME}"
-RequestExecutionLevel admin ; Request application privileges
-
-; --- User Interface Enhancements ---
-; Modern UI Welcome and Finish pages
+; --- Modern UI ---
 !include "MUI2.nsh"
-; !define MUI_WELCOMEFINISH_BMPS ".\installer_welcome.bmp" ; Optional: path to a custom welcome bitmap (164x314 pixels)
-; !define MUI_UNWELCOMEFINISH_BMPS ".\installer_uninstall.bmp" ; Optional: path to a custom uninstall bitmap
-; !define MUI_ABORTWARNING ; Show a warning if the user tries to cancel
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "Run SamRewritten now"
 
@@ -31,23 +32,23 @@ RequestExecutionLevel admin ; Request application privileges
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_UNPAGE_FINISH
 
-; Language selection (optional, but good for a "prettier" installer)
+; Language selection
 !insertmacro MUI_LANGUAGE "English"
 
-; --- Installer Sections ---
+; --- Install Section ---
 Section "Install"
   SetOutPath $INSTDIR
 
-  ; Add your files here
+  ; Main application files
   File "..\SamRewritten-windows-x86_64\${APP_EXE}"
   File "..\SamRewritten-windows-x86_64\README.txt"
-  File /a "..\SamRewritten-windows-x86_64\bin\*.*" ; /a includes all files and subdirectories
+  File /a "..\SamRewritten-windows-x86_64\bin\*.*"
 
-  ; Create start menu shortcut
+  ; Start menu shortcut
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
 
-  ; Create uninstaller
+  ; Registry entries for uninstaller
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayName" "${APP_NAME}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayVersion" "${APP_VERSION}"
@@ -56,15 +57,14 @@ Section "Install"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
-; --- "Launch now" Checkbox ---
+; --- Post-Install: Launch Option ---
 Function .onInstSuccess
-  ; Add a checkbox to launch the application
-  ; !insertmacro MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
-  ; !insertmacro MUI_FINISHPAGE_RUN_TEXT "Launch ${APP_NAME} now"
+  ; The MUI_FINISHPAGE_RUN macro provides a "Run now" checkbox on the finish page.
 FunctionEnd
 
-; --- Uninstaller Section ---
+; --- Uninstall Section ---
 Section "Uninstall"
+  ; Remove application files
   Delete "$INSTDIR\*.*"
   RMDir /r "$INSTDIR\bin"
   RMDir "$INSTDIR"
@@ -73,6 +73,6 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
   RMDir "$SMPROGRAMS\${APP_NAME}"
 
-  ; Remove the uninstaller's registry key
+  ; Remove registry key
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
 SectionEnd

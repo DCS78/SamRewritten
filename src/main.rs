@@ -18,28 +18,31 @@
     windows_subsystem = "windows"
 )]
 
+
 mod backend;
 mod frontend;
 mod steam_client;
 mod utils;
 
-
 use std::process::Command;
+use gtk::glib::{self, ExitCode};
 use crate::backend::{app::app, orchestrator::orchestrator};
 use crate::utils::{arguments::parse_cli_arguments, bidir_child::BidirChild};
 use frontend::main_ui;
-use gtk::glib::{self, ExitCode};
 use utils::app_paths::get_executable_path;
 
+/// The application ID for SamRewritten.
 const APP_ID: &str = "org.sam_authors.sam_rewritten";
 
+/// Main entry point: parses arguments, launches orchestrator/app/backend, or starts the UI.
 fn main() -> glib::ExitCode {
     let arguments = parse_cli_arguments();
 
-
     if arguments.is_orchestrator || arguments.is_app > 0 {
-        let mut tx = arguments.tx.unwrap();
-        let mut rx = arguments.rx.unwrap();
+        let (mut tx, mut rx) = match (arguments.tx, arguments.rx) {
+            (Some(tx), Some(rx)) => (tx, rx),
+            _ => panic!("Missing required IPC channels for orchestrator/app mode"),
+        };
         let exit_code = if arguments.is_orchestrator {
             orchestrator(&mut tx, &mut rx)
         } else {

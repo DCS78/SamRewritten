@@ -1,19 +1,23 @@
-### Medium priority
 
-- Find a new design for the app list (imitate Steam?)
+# TODOs for SamRewritten
 
-### Low priority
+This is a living list of tasks and ideas for improving SamRewritten. Contributions are welcome! If you want to help, check these items or open an issue for discussion.
 
-- Show achievement progression when available
-- Improve error handling (handle .expects, .unwraps, etc)
+## Medium Priority
 
-### Nices to have
+- [ ] Find a new design for the app list (imitate Steam?)
 
-- In utils, instead of calculating Steam install path every time, do it only once
+## Low Priority
 
-### Help needed
+- [ ] Show achievement progression when available
+- [ ] Improve error handling (handle `.expect`, `.unwrap`, etc.)
 
-- Support for Flatpak installs of Steam
-- Fix snapcraft packaging
-- Find a solution to this problem: https://github.com/PaulCombal/achievement-poc
-- Support for flatpak
+## Nice to Have
+
+- [ ] In utils, cache the Steam install path instead of recalculating every time
+
+## Help Needed
+
+- [ ] Support for Flatpak installs of Steam
+- [ ] Fix snapcraft packaging
+- [ ] Find a solution to this problem: [achievement-poc issue](https://github.com/PaulCombal/achievement-poc)

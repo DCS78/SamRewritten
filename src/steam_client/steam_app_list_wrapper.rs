@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -21,6 +20,7 @@ use std::ffi::CStr;
 use std::os::raw::{c_char, c_int};
 use std::sync::Arc;
 
+/// Safe Rust wrapper for the ISteamAppList interface.
 pub struct SteamAppList {
     inner: Arc<SteamAppListInner>,
 }
@@ -30,15 +30,18 @@ struct SteamAppListInner {
 }
 
 impl SteamAppList {
+    /// Constructs a new `SteamAppList` from a raw pointer.
+    /// # Safety
+    /// The pointer must be valid and point to a live ISteamAppList.
     pub unsafe fn from_raw(ptr: *mut ISteamAppList) -> Self {
         Self {
             inner: Arc::new(SteamAppListInner { ptr }),
         }
     }
 
+    /// Gets the name of an app by its AppId.
     pub fn get_app_name(&self, app_id: AppId_t) -> Result<String, SteamClientError> {
         let mut buffer = vec![0u8; 256];
-
         unsafe {
             let vtable = (*self.inner.ptr)
                 .vtable

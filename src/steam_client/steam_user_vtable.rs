@@ -12,12 +12,16 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
-#![allow(dead_code)]
+
+//! Provides raw FFI bindings for the `ISteamUser` interface vtable.
+//! All functions in this vtable are unsafe and must be called with valid pointers and correct types as expected by the Steamworks API.
 use crate::steam_client::steamworks_types::{
     AppId_t, CGameID, CSteamID, HSteamUser, SteamAPICall_t, SteamNetworkingIdentity,
 };
 use std::os::raw::{c_char, c_int, c_void};
 
+/// Raw vtable for the ISteamUser interface.
+/// All function pointers must be called with valid pointers and correct types as expected by the Steamworks API.
 #[repr(C)]
 pub struct ISteamUserVTable {
     pub get_h_steam_user: unsafe extern "C" fn(*mut ISteamUser) -> HSteamUser,
@@ -96,9 +100,12 @@ pub struct ISteamUserVTable {
     pub b_set_duration_control_online_state: unsafe extern "C" fn(*mut ISteamUser, c_int) -> bool,
 }
 
+/// Opaque struct representing an ISteamUser instance.
 #[repr(C)]
 pub struct ISteamUser {
+    /// Pointer to the vtable for this instance.
     pub vtable: *const ISteamUserVTable,
 }
 
+/// The interface version string for ISteamUser.
 pub const STEAMUSER_INTERFACE_VERSION: &str = "SteamUser023\0";

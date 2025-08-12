@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod app;
 pub mod app_lister;
 pub mod app_manager;
 pub mod connected_steam;
@@ -22,3 +21,4 @@ pub mod orchestrator;
 pub mod stat_definitions;
 mod tests;
 pub mod types;
+pub mod app;

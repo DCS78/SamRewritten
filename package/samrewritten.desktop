@@ -1,9 +1,12 @@
 [Desktop Entry]
-Name=SamRewritten
-Exec=/usr/bin/samrewritten
-Terminal=false
+Version=1.0
 Type=Application
+Name=SamRewritten
+GenericName=Steam Achievements Manager
+Comment=Unlock, lock, and manage Steam achievements and stats
+Exec=/usr/bin/samrewritten
 Icon=samrewritten
-Comment=Steam Achievement Manager
-Categories=Game;
-StartupWMClass=samrewritten;
+Terminal=false
+Categories=Game;Utility;
+StartupWMClass=samrewritten
+Keywords=steam;achievements;manager;game;stats;unlock;linux;windows;

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -14,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Provides raw FFI bindings for the `ISteamUserStats` interface vtable.
+//! All functions in this vtable are unsafe and must be called with valid pointers and correct types as expected by the Steamworks API.
 use crate::steam_client::steamworks_types::{
     CSteamID, ELeaderboardDataRequest, ELeaderboardDisplayType, ELeaderboardSortMethod,
     ELeaderboardUploadScoreMethod, LeaderboardEntry_t, SteamAPICall_t, SteamLeaderboard_t,
@@ -21,6 +22,8 @@ use crate::steam_client::steamworks_types::{
 };
 use std::os::raw::{c_char, c_float, c_int};
 
+/// Raw vtable for the ISteamUserStats interface.
+/// All function pointers must be called with valid pointers and correct types as expected by the Steamworks API.
 #[repr(C)]
 pub struct ISteamUserStatsVTable {
     #[cfg(target_os = "windows")]
@@ -165,9 +168,12 @@ pub struct ISteamUserStatsVTable {
     ) -> bool,
 }
 
+/// Opaque struct representing an ISteamUserStats instance.
 #[repr(C)]
 pub struct ISteamUserStats {
+    /// Pointer to the vtable for this instance.
     pub vtable: *const ISteamUserStatsVTable,
 }
 
+/// The interface version string for ISteamUserStats.
 pub const STEAMUSERSTATS_INTERFACE_VERSION: &str = "STEAMUSERSTATS_INTERFACE_VERSION013\0";

@@ -1,1 +1,4 @@
+# Ignore built Arch Linux package files
 *.zst
+
+# Add more patterns below as needed for package build artifacts

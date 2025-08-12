@@ -1,39 +1,42 @@
-/* Copyright (c) 2024 Rick (rick 'at' gibbed 'dot' us)
- *
- * This software is provided 'as-is', without any express or implied
- * warranty. In no event will the authors be held liable for any damages
- * arising from the use of this software.
- *
- * Permission is granted to anyone to use this software for any purpose,
- * including commercial applications, and to alter it and redistribute it
- * freely, subject to the following restrictions:
- *
- * 1. The origin of this software must not be misrepresented; you must not
- *    claim that you wrote the original software. If you use this software
- *    in a product, an acknowledgment in the product documentation would
- *    be appreciated but is not required.
- *
- * 2. Altered source versions must be plainly marked as such, and must not
- *    be misrepresented as being the original software.
- *
- * 3. This notice may not be removed or altered from any source
- *    distribution.
- */
+
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::ops::{BitOr, BitOrAssign};
-use std::time::SystemTime;
+use std::{
+    fmt,
+    ops::{BitOr, BitOrAssign},
+    time::SystemTime,
+};
 
+
+/// Bitflags for stat permissions and properties.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StatFlags {
     bits: u32,
 }
 
 impl StatFlags {
+
+    /// No flags set.
     pub const NONE: StatFlags = StatFlags { bits: 0 };
+    /// Stat can only be incremented.
     pub const INCREMENT_ONLY: StatFlags = StatFlags { bits: 1 << 0 };
+    /// Stat is protected.
     pub const PROTECTED: StatFlags = StatFlags { bits: 1 << 1 };
+    /// Stat has unknown permission bits set.
     pub const UNKNOWN_PERMISSION: StatFlags = StatFlags { bits: 1 << 2 };
 
     pub fn bits(&self) -> u32 {
@@ -65,7 +68,8 @@ impl BitOrAssign for StatFlags {
     }
 }
 
-// Error type
+
+/// Error returned when attempting to modify a protected stat.
 #[derive(Debug, Clone)]
 pub struct StatIsProtectedError {
     message: String,
@@ -93,13 +97,16 @@ impl fmt::Display for StatIsProtectedError {
 
 impl std::error::Error for StatIsProtectedError {}
 
-// Stat Definition hierarchy
+
+/// Definition of a stat (float or integer).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StatDefinition {
     Float(FloatStatDefinition),
     Integer(IntegerStatDefinition),
 }
 
+
+/// Common fields for all stat definitions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseStatDefinition {
     pub id: String,
@@ -108,6 +115,8 @@ pub struct BaseStatDefinition {
     pub permission: i32,
 }
 
+
+/// Definition for a floating-point stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FloatStatDefinition {
     pub base: BaseStatDefinition,
@@ -118,6 +127,8 @@ pub struct FloatStatDefinition {
     pub default_value: f32,
 }
 
+
+/// Definition for an integer stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegerStatDefinition {
     pub base: BaseStatDefinition,
@@ -129,7 +140,8 @@ pub struct IntegerStatDefinition {
     pub default_value: i32,
 }
 
-// Stat Info hierarchy
+
+/// Runtime info for a stat (float or integer).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StatInfo {
     Float(FloatStatInfo),
@@ -173,6 +185,8 @@ impl StatInfo {
     }
 }
 
+
+/// Runtime info for a floating-point stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FloatStatInfo {
     pub id: String,
@@ -216,6 +230,8 @@ impl FloatStatInfo {
     }
 }
 
+
+/// Runtime info for an integer stat.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntStatInfo {
     pub id: String,
@@ -259,7 +275,8 @@ impl IntStatInfo {
     }
 }
 
-// Achievement types
+
+/// Definition of an achievement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AchievementDefinition {
     pub id: String,
@@ -287,6 +304,8 @@ impl fmt::Display for AchievementDefinition {
     }
 }
 
+
+/// Runtime info for an achievement.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AchievementInfo {
     pub id: String,

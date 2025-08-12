@@ -1,26 +1,28 @@
-## Global architecture schema
+
+# SamRewritten Project Documentation
+
+Welcome to the technical documentation for SamRewritten. This document provides an overview of the project's architecture, design decisions, and code organization.
+
+## Architecture Overview
 
 ![Architectural software schema](samdoc.drawio.png)
 
-The orchestrator part of this tool could be reused for farming account game time, or farming card drops.
-It is highly modular, and it is easy to interface with from other Rust programs using Serde.
+SamRewritten is designed with modularity and extensibility in mind. The orchestrator component can be reused for tasks such as farming account game time or card drops. Its modular design makes it easy to interface with from other Rust programs using Serde for serialization.
 
-Communications are made via pipes and work in a request-response fashion.
-While crates like bincode could be used for performance gains, JSON was still chosen for its ease of use and human
-readability.
-It wasn't found that this posed a significant bottleneck.
+### Communication
 
-The reason why the orchestrator doesn't execute the game functions itself is because
-Steam will still show you as being "in game" as long as the game process you started didn't finish,
-and its zombie process waited.
+- Inter-process communication is handled via pipes in a request-response pattern.
+- JSON is used for message serialization for its human readability and ease of debugging, despite alternatives like `bincode` offering better performance. In practice, JSON has not been a significant bottleneck.
 
-## Code folders
+### Orchestrator Design
 
-* backend
-  * Orchestrator and app servers
-* frontend
-  * Client UI
-* steam_client
-  * Steamworks SDK bindings, used by the backend
-* utils
-  * Regular functions used by other modules, mostly for file path functions and IPC types.
+- The orchestrator does not execute game functions directly. This is intentional: Steam will continue to show you as "in game" as long as the started game process (or its zombie) is running. By separating orchestration from execution, the tool avoids this issue.
+
+## Code Organization
+
+- **backend**: Orchestrator and app servers
+- **frontend**: Client UI
+- **steam_client**: Steamworks SDK bindings, used by the backend
+- **utils**: Shared utility functions, including file path helpers and IPC types
+
+For more details, see the source code and module-level documentation.

@@ -1,13 +1,22 @@
-# This will not work because it can't access anything under a .folder location.
-# Even with a custom plug, it will refuse to load the library. It works in devmode, useful for screenshots.
+# snapcraft_strict.yaml
+# ---------------------
+# Strict confinement Snapcraft manifest for SamRewritten.
+#
+# Note: This configuration is primarily for development and screenshots.
+#       Due to strict confinement, access to certain Steam libraries under hidden folders (e.g., .local/share/Steam)
+#       is not possible, even with custom plugs. This works in devmode, but not in strict mode for production use.
+#
+# See also: snapcraft.yaml (for classic confinement or production builds)
 
 name: samrewritten
-version: '1.0'
-summary: Steam achievements manager, rewritten
-description: Unlock achievements and stats on Steam, and much more!
+version: "1.0"
+summary: Steam Achievements Manager (Rewritten)
+description: |
+  Unlock and manage achievements and stats on Steam. Cross-platform, modern, and open source.
 confinement: strict
 base: core24
 license: GPL-3.0
+
 parts:
   samrewritten:
     plugin: rust
@@ -27,7 +36,8 @@ plugs:
   access-steam-folder:
     interface: personal-files
     read:
-      - $HOME/snap/steam/common/.local/share/Steam/linux64/steamclient.so
+      - "$HOME/snap/steam/common/.local/share/Steam/linux64/steamclient.so"
+    # TODO: This plug does not work under strict confinement for hidden folders. See top-level comment.
 
 slots:
   dbus-samrewritten:
@@ -35,11 +45,10 @@ slots:
     bus: session
     name: org.sam_authors.sam_rewritten
 
-
 apps:
   samrewritten:
     environment:
-      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libproxy # remove when this is in stable https://github.com/canonical/snapcraft-desktop-integration/pull/27
+      LD_LIBRARY_PATH: "$LD_LIBRARY_PATH:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libproxy" # Remove when fixed upstream
     command: bin/samrewritten
     extensions: [gnome]
     plugs:

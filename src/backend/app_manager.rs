@@ -13,24 +13,36 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::backend::connected_steam::ConnectedSteam;
-use crate::backend::key_value::KeyValue;
-use crate::backend::stat_definitions::{
-    AchievementDefinition, AchievementInfo, BaseStatDefinition, FloatStatDefinition, FloatStatInfo,
-    IntStatInfo, IntegerStatDefinition, StatDefinition, StatInfo,
+use std::{
+    env,
+    path::PathBuf,
+    time::UNIX_EPOCH,
 };
-use crate::backend::types::UserStatType;
-use crate::dev_println;
-use crate::steam_client::steamworks_types::{
-    AppId_t, EResult, GlobalAchievementPercentagesReady_t, UserStatsReceived_t,
+use crate::{
+    backend::{
+        connected_steam::ConnectedSteam,
+        key_value::KeyValue,
+        stat_definitions::{
+            AchievementDefinition, AchievementInfo, BaseStatDefinition, FloatStatDefinition, FloatStatInfo,
+            IntStatInfo, IntegerStatDefinition, StatDefinition, StatInfo,
+        },
+        types::UserStatType,
+    },
+    dev_println,
+    steam_client::{
+        steamworks_types::{
+            AppId_t, EResult, GlobalAchievementPercentagesReady_t, UserStatsReceived_t,
+        },
+        wrapper_types::SteamCallbackId,
+    },
+    utils::{
+        app_paths::get_user_game_stats_schema_path,
+        ipc_types::SamError,
+    },
 };
-use crate::steam_client::wrapper_types::SteamCallbackId;
-use crate::utils::app_paths::get_user_game_stats_schema_path;
-use crate::utils::ipc_types::SamError;
-use std::env;
-use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
+/// Manages stats, achievements, and definitions for a Steam app.
+#[derive(Debug)]
 pub struct AppManager {
     app_id: AppId_t,
     connected_steam: ConnectedSteam,

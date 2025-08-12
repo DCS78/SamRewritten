@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+/// Prints to stdout only in debug builds (like `println!`).
 #[macro_export]
 macro_rules! dev_println {
     ($($arg:tt)*) => {
@@ -22,6 +23,7 @@ macro_rules! dev_println {
     };
 }
 
+/// Prints to stdout only in debug builds (like `print!`).
 #[macro_export]
 macro_rules! dev_print {
     ($($arg:tt)*) => {

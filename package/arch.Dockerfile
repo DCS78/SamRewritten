@@ -1,18 +1,22 @@
+
+# ArchLinux Dockerfile for building SamRewritten packages
+# ------------------------------------------------------
+# This container provides a safe, reproducible environment for building Arch packages.
+
 FROM archlinux:latest
 
-# ENV PKGEXT=".pkg.tar.zst" # Default Arch package extension
-
-RUN pacman -Syu --noconfirm \
+# Install build dependencies and sudo
+RUN pacman -Syu --noconfirm --needed \
     base-devel \
     git \
     rust \
     gtk4 \
-    libadwaita
+    libadwaita \
+    sudo
 
-# Create a non-root user for building packages
-# It's good practice to avoid building as root for security and permission reasons.
-RUN useradd -m -g users -G wheel builder
-RUN echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+# Create a non-root user for building packages (recommended for security)
+RUN useradd -m -g users -G wheel builder && \
+    echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 USER builder
 WORKDIR /mnt

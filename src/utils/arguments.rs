@@ -13,19 +13,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::dev_println;
+use std::{
+    cell::Cell,
+    env,
+    process::exit,
+    rc::Rc,
+};
 use gtk::gio::ApplicationCommandLine;
 use gtk::prelude::ApplicationCommandLineExt;
 use interprocess::unnamed_pipe::{Recver, Sender};
-use std::cell::Cell;
-use std::env;
 #[cfg(unix)]
 use std::os::fd::FromRawFd;
 #[cfg(windows)]
 use std::os::windows::io::{FromRawHandle, RawHandle};
-use std::process::exit;
-use std::rc::Rc;
+use crate::dev_println;
 
+
+/// Parsed command-line arguments for orchestrator/app mode.
 #[derive(Debug)]
 pub struct CliArguments {
     pub is_orchestrator: bool,
@@ -34,11 +38,13 @@ pub struct CliArguments {
     pub tx: Option<Sender>,
 }
 
+/// Parsed arguments for GUI mode.
 #[derive(Debug)]
 pub struct GuiArguments {
     pub auto_open: Rc<Cell<u32>>,
 }
 
+/// Parses command-line arguments for orchestrator/app mode.
 pub fn parse_cli_arguments() -> CliArguments {
     let mut args = CliArguments {
         is_orchestrator: false,
@@ -53,59 +59,49 @@ pub fn parse_cli_arguments() -> CliArguments {
             continue;
         }
 
-        match arg.as_str() {
-            "--orchestrator" => {
-                args.is_orchestrator = true;
+        if arg == "--orchestrator" {
+            args.is_orchestrator = true;
+            continue;
+        }
+
+        // Parse --key=value arguments
+        if let Some((key, value)) = arg.split_once('=') {
+            if value.is_empty() {
                 continue;
             }
-            _ => unsafe {
-                let split: Vec<&str> = arg.split("=").collect();
-                if split.len() != 2 {
-                    continue;
-                }
 
-                let key = split[0];
-                let value = split[1];
+            if key == "--app" {
+                args.is_app = value.parse::<u32>().unwrap();
+                continue;
+            }
 
-                if value.len() == 0 {
-                    continue;
-                }
+            #[cfg(target_os = "linux")]
+            if key == "--tx" {
+                let raw_handle = value.parse::<i32>().expect("Invalid value for --tx");
+                args.tx = Some(unsafe { Sender::from_raw_fd(raw_handle) });
+                continue;
+            }
 
-                if key == "--app" {
-                    args.is_app = value.parse::<u32>().unwrap();
-                    continue;
-                }
+            #[cfg(target_os = "windows")]
+            if key == "--tx" {
+                let raw_handle = value.parse::<usize>().expect("Invalid value for --tx") as RawHandle;
+                args.tx = Some(unsafe { Sender::from_raw_handle(raw_handle) });
+                continue;
+            }
 
-                #[cfg(target_os = "linux")]
-                if key == "--tx" {
-                    let raw_handle = value.parse::<i32>().expect("Invalid value for --tx");
-                    args.tx = Some(Sender::from_raw_fd(raw_handle));
-                    continue;
-                }
+            #[cfg(target_os = "linux")]
+            if key == "--rx" {
+                let raw_handle = value.parse::<i32>().expect("Invalid value for --rx");
+                args.rx = Some(unsafe { Recver::from_raw_fd(raw_handle) });
+                continue;
+            }
 
-                #[cfg(target_os = "windows")]
-                if key == "--tx" {
-                    let raw_handle =
-                        value.parse::<usize>().expect("Invalid value for --tx") as RawHandle;
-                    args.tx = Some(Sender::from_raw_handle(raw_handle));
-                    continue;
-                }
-
-                #[cfg(target_os = "linux")]
-                if key == "--rx" {
-                    let raw_handle = value.parse::<i32>().expect("Invalid value for --rx");
-                    args.rx = Some(Recver::from_raw_fd(raw_handle));
-                    continue;
-                }
-
-                #[cfg(target_os = "windows")]
-                if key == "--rx" {
-                    let raw_handle =
-                        value.parse::<usize>().expect("Invalid value for --rx") as RawHandle;
-                    args.rx = Some(Recver::from_raw_handle(raw_handle));
-                    continue;
-                }
-            },
+            #[cfg(target_os = "windows")]
+            if key == "--rx" {
+                let raw_handle = value.parse::<usize>().expect("Invalid value for --rx") as RawHandle;
+                args.rx = Some(unsafe { Recver::from_raw_handle(raw_handle) });
+                continue;
+            }
         }
     }
 
@@ -115,10 +111,10 @@ pub fn parse_cli_arguments() -> CliArguments {
     }
 
     dev_println!("New process launched with arguments: {:?}", args);
-
     args
 }
 
+/// Parses GUI arguments from a GTK ApplicationCommandLine.
 pub fn parse_gui_arguments(cmd_line: &ApplicationCommandLine) -> GuiArguments {
     let arguments = cmd_line.arguments();
     let args = GuiArguments {
@@ -128,12 +124,13 @@ pub fn parse_gui_arguments(cmd_line: &ApplicationCommandLine) -> GuiArguments {
     for arg in arguments.iter().skip(1) {
         // Skip the first argument (program name)
         if let Some(arg_str) = arg.to_str() {
-            if arg_str.starts_with("--auto-open=") {
-                if let Some(value_str) = arg_str.strip_prefix("--auto-open=") {
-                    if let Ok(value) = value_str.parse::<u32>() {
+            if let Some(value_str) = arg_str.strip_prefix("--auto-open=") {
+                match value_str.parse::<u32>() {
+                    Ok(value) => {
                         args.auto_open.set(value);
                         println!("Parsed --auto-open value: {}", value);
-                    } else {
+                    }
+                    Err(_) => {
                         eprintln!("Error: Invalid value for --auto-open: {}", value_str);
                     }
                 }

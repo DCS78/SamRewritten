@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -13,20 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::dev_println;
-use crate::steam_client::steam_apps_001_wrapper::{SteamApps001, SteamApps001AppDataKeys};
-use crate::steam_client::steam_apps_wrapper::SteamApps;
-use crate::steam_client::steamworks_types::AppId_t;
-use crate::utils::app_paths::get_app_cache_dir;
-use crate::utils::ipc_types::SamError;
+use std::{
+    fmt::{self, Display},
+    fs::{self, File},
+    io::BufReader,
+    str::FromStr,
+    time::{Duration, SystemTime},
+};
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
-use std::fs;
-use std::fs::File;
-use std::io::BufReader;
-use std::str::FromStr;
-use std::time::{Duration, SystemTime};
+use crate::{
+    dev_println,
+    steam_client::{
+        steam_apps_001_wrapper::{SteamApps001, SteamApps001AppDataKeys},
+        steam_apps_wrapper::SteamApps,
+        steamworks_types::AppId_t,
+    },
+    utils::{app_paths::get_app_cache_dir, ipc_types::SamError},
+};
 
+/// Loads, parses, and manages the list of Steam apps for the user.
+#[derive(Debug)]
 pub struct AppLister<'a> {
     app_list_url: String,
     app_list_local: String,
@@ -35,7 +42,8 @@ pub struct AppLister<'a> {
     steam_apps: &'a SteamApps,
 }
 
-#[derive(Serialize, Deserialize)]
+/// Model for a Steam app.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppModel {
     pub app_id: AppId_t,
     pub app_name: String,
@@ -45,7 +53,8 @@ pub struct AppModel {
     pub metacritic_score: Option<u8>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+/// Enum for Steam app type.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppModelType {
     App,
     Mod,
@@ -54,12 +63,12 @@ pub enum AppModelType {
 }
 
 impl Display for AppModelType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AppModelType::App => write!(f, "App"),
-            AppModelType::Mod => write!(f, "Mod"),
-            AppModelType::Demo => write!(f, "Demo"),
-            AppModelType::Junk => write!(f, "Junk"),
+            Self::App => write!(f, "App"),
+            Self::Mod => write!(f, "Mod"),
+            Self::Demo => write!(f, "Demo"),
+            Self::Junk => write!(f, "Junk"),
         }
     }
 }
@@ -69,16 +78,17 @@ impl FromStr for AppModelType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "app" => Ok(AppModelType::App),
-            "mod" => Ok(AppModelType::Mod),
-            "demo" => Ok(AppModelType::Demo),
-            "junk" => Ok(AppModelType::Junk),
+            "app" => Ok(Self::App),
+            "mod" => Ok(Self::Mod),
+            "demo" => Ok(Self::Demo),
+            "junk" => Ok(Self::Junk),
             _ => Err(format!("'{}' is not a valid AppModelType", s)),
         }
     }
 }
 
-#[derive(Deserialize)]
+/// XML representation of a game entry.
+#[derive(Deserialize, Debug, Clone)]
 pub struct XmlGame {
     #[serde(rename = "$text")]
     pub app_id: u32,
@@ -86,130 +96,114 @@ pub struct XmlGame {
     pub app_type: Option<String>,
 }
 
-#[derive(Deserialize)]
+/// XML representation of a list of games.
+#[derive(Deserialize, Debug, Clone)]
 struct XmlGames {
     #[serde(rename = "game")]
     pub games: Vec<XmlGame>,
 }
 impl<'a> AppLister<'a> {
+    /// Create a new AppLister.
     pub fn new(steam_apps_001: &'a SteamApps001, steam_apps: &'a SteamApps) -> Self {
         let cache_dir = get_app_cache_dir();
-        let app_list_url =
-            std::env::var("APP_LIST_URL").unwrap_or(String::from("https://gib.me/sam/games.xml"));
-        let app_list_local = std::env::var("APP_LIST_LOCAL").unwrap_or(String::from("/apps.xml"));
+        let app_list_url = std::env::var("APP_LIST_URL").unwrap_or_else(|_| "https://gib.me/sam/games.xml".to_string());
+        let app_list_local = std::env::var("APP_LIST_LOCAL").unwrap_or_else(|_| "/apps.xml".to_string());
         let current_language = steam_apps.get_current_game_language();
 
-        AppLister {
+        Self {
             app_list_url,
-            app_list_local: cache_dir + &app_list_local,
+            app_list_local: format!("{}{}", cache_dir, app_list_local),
             current_language,
             steam_apps_001,
             steam_apps,
         }
     }
 
+    /// Download the app list as a string from the remote URL.
     fn download_app_list_str(&self) -> Result<String, SamError> {
-        dev_println!(
-            "[ORCHESTRATOR] Downloading app list from:  {}",
-            &self.app_list_url
-        );
+        dev_println!("[ORCHESTRATOR] Downloading app list from:  {}", &self.app_list_url);
         let response = reqwest::blocking::get(&self.app_list_url)
-            .unwrap()
+            .map_err(|_| SamError::AppListRetrievalFailed)?
             .text()
             .map_err(|_| SamError::AppListRetrievalFailed)?;
         Ok(response)
     }
 
+    /// Load the app list from the local XML file.
     fn load_app_list_file(&self) -> Result<XmlGames, SamError> {
-        let f = File::open(&self.app_list_local).map_err(|_| SamError::AppListRetrievalFailed)?;
-        let f = BufReader::new(f);
-        let xml_data: XmlGames =
-            quick_xml::de::from_reader(f).map_err(|_| SamError::AppListRetrievalFailed)?;
+        let file = File::open(&self.app_list_local).map_err(|_| SamError::AppListRetrievalFailed)?;
+        let reader = BufReader::new(file);
+        let xml_data: XmlGames = quick_xml::de::from_reader(reader).map_err(|_| SamError::AppListRetrievalFailed)?;
         Ok(xml_data)
     }
 
-    fn load_app_list_str(&self, source: &String) -> Result<XmlGames, SamError> {
-        let xml_data: XmlGames =
-            quick_xml::de::from_str(source).map_err(|_| SamError::AppListRetrievalFailed)?;
+    /// Load the app list from a string.
+    fn load_app_list_str(&self, source: &str) -> Result<XmlGames, SamError> {
+        let xml_data: XmlGames = quick_xml::de::from_str(source).map_err(|_| SamError::AppListRetrievalFailed)?;
         Ok(xml_data)
     }
 
+    /// Get the XML games, updating from remote if needed.
     fn get_xml_games(&self) -> Result<XmlGames, SamError> {
+        const ONE_WEEK_SECS: u64 = 7 * 24 * 60 * 60;
         let should_update = match fs::metadata(&self.app_list_local) {
             Ok(metadata) => {
-                let last_update = metadata
-                    .modified()
-                    .map_err(|_| SamError::AppListRetrievalFailed)?;
-                let one_week_ago = SystemTime::now() - Duration::from_secs(7 * 24 * 60 * 60); // 7 days
+                let last_update = metadata.modified().map_err(|_| SamError::AppListRetrievalFailed)?;
+                let one_week_ago = SystemTime::now() - Duration::from_secs(ONE_WEEK_SECS);
                 last_update < one_week_ago
             }
             Err(_) => true,
         };
 
-        let xml_games: XmlGames;
-
-        if should_update {
+        let xml_games = if should_update {
             let app_list_str = self.download_app_list_str()?;
-            xml_games = self.load_app_list_str(&app_list_str)?;
-
-            dev_println!(
-                "[ORCHESTRATOR] App list loaded. Saving in:  {}",
-                &self.app_list_local
-            );
-            fs::write(&self.app_list_local, &app_list_str)
-                .map_err(|_| SamError::AppListRetrievalFailed)?;
+            let xml_games = self.load_app_list_str(&app_list_str)?;
+            dev_println!("[ORCHESTRATOR] App list loaded. Saving in:  {}", &self.app_list_local);
+            fs::write(&self.app_list_local, &app_list_str).map_err(|_| SamError::AppListRetrievalFailed)?;
+            xml_games
         } else {
             dev_println!("[ORCHESTRATOR] Loading app list from local location");
-            xml_games = self.load_app_list_file()?;
-        }
+            self.load_app_list_file()?
+        };
 
         Ok(xml_games)
     }
 
+    /// Get the image URL for a given app.
     fn get_app_image_url(&self, app_id: &AppId_t) -> Option<String> {
-        let candidate = self
-            .steam_apps_001
-            .get_app_data(
-                app_id,
-                &SteamApps001AppDataKeys::SmallCapsule(&self.current_language).as_string(),
-            )
-            .unwrap_or("".to_owned());
+        let try_capsule = |lang| {
+            self.steam_apps_001
+                .get_app_data(app_id, &SteamApps001AppDataKeys::SmallCapsule(lang).as_string())
+                .unwrap_or_default()
+        };
+        let candidate = try_capsule(&self.current_language);
         if !candidate.is_empty() {
             return Some(format!(
                 "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/{candidate}"
             ));
         }
-
         if self.current_language != "english" {
-            let candidate = self
-                .steam_apps_001
-                .get_app_data(
-                    app_id,
-                    &SteamApps001AppDataKeys::SmallCapsule("english").as_string(),
-                )
-                .unwrap_or("".to_owned());
+            let candidate = try_capsule("english");
             if !candidate.is_empty() {
                 return Some(format!(
                     "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{app_id}/{candidate}"
                 ));
             }
         }
-
         let candidate = self
             .steam_apps_001
             .get_app_data(app_id, &SteamApps001AppDataKeys::Logo.as_string())
-            .unwrap_or("".to_owned());
+            .unwrap_or_default();
         if !candidate.is_empty() {
             return Some(format!(
                 "https://cdn.steamstatic.com/steamcommunity/public/images/apps/{app_id}/{candidate}.jpg"
             ));
         }
-
         dev_println!("[ORCHESTRATOR] Failed to find image for app {}", app_id);
-
         None
     }
 
+    /// Get an AppModel for a given app_id and XmlGame.
     pub fn get_app(&self, app_id: AppId_t, xml_game: &XmlGame) -> Result<AppModel, SamError> {
         let app_name = self
             .steam_apps_001
@@ -218,50 +212,40 @@ impl<'a> AppLister<'a> {
         let developer = self
             .steam_apps_001
             .get_app_data(&app_id, &SteamApps001AppDataKeys::Developer.as_string())
-            .unwrap_or("Unknown".to_string());
+            .unwrap_or_else(|_| "Unknown".to_string());
         let metacritic_score: Option<u8> = self
             .steam_apps_001
-            .get_app_data(
-                &app_id,
-                &SteamApps001AppDataKeys::MetacriticScore.as_string(),
-            )
+            .get_app_data(&app_id, &SteamApps001AppDataKeys::MetacriticScore.as_string())
             .ok()
             .and_then(|s| s.parse().ok());
         let image_url = self.get_app_image_url(&app_id);
-
+        let app_type = xml_game
+            .app_type
+            .as_deref()
+            .map_or(Ok(AppModelType::App), AppModelType::from_str)
+            .map_err(|_| SamError::AppListRetrievalFailed)?;
         Ok(AppModel {
             app_id,
             app_name,
             image_url,
-            app_type: if xml_game.app_type.as_ref().is_none() {
-                AppModelType::App
-            } else {
-                AppModelType::from_str(&xml_game.app_type.as_ref().unwrap())
-                    .map_err(|_| SamError::AppListRetrievalFailed)?
-            },
+            app_type,
             developer,
             metacritic_score,
         })
     }
 
+    /// Get all owned apps as AppModel.
     pub fn get_owned_apps(&self) -> Result<Vec<AppModel>, SamError> {
         let xml_games = self.get_xml_games()?;
-
-        // IClientUserStats::GetNumAchievedAchievements( 291550, ) = 0,
-        // IClientUserStats::GetNumAchievements( 291550, ) = 65
-
-        let mut models = vec![];
+        let mut models = Vec::new();
         for xml_game in xml_games.games {
             let app_id: AppId_t = xml_game.app_id;
-
-            if self.steam_apps.is_subscribed_app(app_id).unwrap_or(false) == false {
+            if !self.steam_apps.is_subscribed_app(app_id).unwrap_or(false) {
                 continue;
             }
-
             let app = self.get_app(app_id, &xml_game)?;
-            models.push(app)
+            models.push(app);
         }
-
         Ok(models)
     }
 }

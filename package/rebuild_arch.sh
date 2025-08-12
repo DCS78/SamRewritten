@@ -1,10 +1,31 @@
-# This is a dev script
-# It is not possible to build in a bind-mounted volume, so we build outside the mount and copy the result
+#!/bin/bash
+#
+# rebuild_arch.sh - Developer script to build the Arch Linux package for SamRewritten.
+#
+# Usage: Run from a system with makepkg and PKGBUILD available.
+# Note: Building in a bind-mounted volume is not supported; this script builds in /tmp and copies the result.
 
-rm -rf /tmp/build
-mkdir -p /tmp/build
-cp /mnt/package/PKGBUILD /tmp/build
-pushd /tmp/build
+set -euo pipefail
+
+PKG_SRC="/mnt/package/PKGBUILD"
+BUILD_DIR="/tmp/build"
+DEST_DIR="/mnt/package"
+
+# Check for PKGBUILD
+if [[ ! -f "$PKG_SRC" ]]; then
+	echo "Error: PKGBUILD not found at $PKG_SRC" >&2
+	exit 1
+fi
+
+# Prepare build directory
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+cp "$PKG_SRC" "$BUILD_DIR"
+
+# Build package
+pushd "$BUILD_DIR" > /dev/null
 makepkg
-popd
-cp /tmp/build/*.zst /mnt/package
+popd > /dev/null
+
+# Copy built package(s) to destination
+cp "$BUILD_DIR"/*.zst "$DEST_DIR"

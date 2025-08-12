@@ -1,3 +1,7 @@
+# =====================================
+# SamRewritten Cargo Manifest
+# Modern, idiomatic, and well-documented Cargo.toml for the project.
+# =====================================
 
 [package]
 name = "SamRewritten"
@@ -11,9 +15,6 @@ authors = [
 ]
 
 
-# =====================
-# Dependencies (alphabetical)
-# =====================
 [dependencies]
 adw = { version = "0.8.0", package = "libadwaita", features = ["v1_4"], optional = true } # latest as of 2025-07
 gtk = { version = "0.10.0", package = "gtk4", features = ["v4_12"] } # latest as of 2025-07
@@ -25,11 +26,13 @@ reqwest = { version = "0.12.22", features = ["blocking"] } # latest as of 2025-0
 serde = { version = "1.0.196", features = ["derive"] } # latest as of 2025-07
 serde_json = "1.0.139"
 
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.15.0"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
+
 
 
 # =====================
@@ -43,10 +46,10 @@ ProductVersion = "0.1.0"
 FileVersion = "0.1.0"
 Icon = "assets/icon.ico"
 
-
 [package.metadata.appimage]
 icon = "assets/icon.ico"
 desktop_entry = "package/samrewritten.desktop"
+
 
 
 # =====================
@@ -57,6 +60,7 @@ lto = "fat"
 codegen-units = 1
 opt-level = "z"
 strip = true
+
 
 
 # =====================

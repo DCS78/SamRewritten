@@ -15,13 +15,19 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::app_manager::AppManager;
-    use crate::backend::connected_steam::ConnectedSteam;
-    use crate::backend::key_value::KeyValue;
+    use crate::backend::{
+        app_manager::AppManager,
+        connected_steam::ConnectedSteam,
+        key_value::KeyValue,
+    };
     use crate::steam_client::steam_apps_001_wrapper::SteamApps001AppDataKeys;
-    use std::env;
-    use std::path::PathBuf;
+    use std::{
+        env,
+        path::PathBuf,
+    };
 
+
+    /// Test fetching achievements for a known app.
     #[test]
     fn get_achievements_with_callback() {
         let mut app_manager =
@@ -29,29 +35,34 @@ mod tests {
         let achievements = app_manager
             .get_achievements()
             .expect("Failed to get achievements");
-        println!("{achievements:?}")
+        println!("{achievements:?}");
     }
 
+
+    /// Test fetching stats for a known app.
     #[test]
     fn get_stats_no_message() {
         let mut app_manager = AppManager::new_connected(480).expect("Failed to create app manager");
         let stats = app_manager.get_statistics().expect("Failed to get stats");
-        println!("{stats:?}")
+        println!("{stats:?}");
     }
 
+
+    /// Test resetting all stats for a known app.
     #[test]
     fn reset_stats_no_message() {
         let app_manager = AppManager::new_connected(480).expect("Failed to create app manager");
         let success = app_manager
             .reset_all_stats(true)
-            .expect("Failed to get stats");
-        println!("Success: {success:?}")
+            .expect("Failed to reset stats");
+        println!("Success: {success:?}");
     }
 
+
+    /// Test brute-forcing various app data keys for SteamApps001.
     #[test]
     fn brute_force_app001_keys() {
         // Find others on your own with the Steam command app_info_print
-
         let connected_steam = ConnectedSteam::new().expect("Failed to create connected steam");
         let try_force = |key: &str| {
             let null_terminated_key = format!("{key}\0");
@@ -60,7 +71,7 @@ mod tests {
                 connected_steam
                     .apps_001
                     .get_app_data(&220, &null_terminated_key)
-                    .unwrap_or("Failure".to_string())
+                    .unwrap_or_else(|| "Failure".to_string())
             );
         };
 
@@ -97,6 +108,8 @@ mod tests {
         try_force("clienticon");
     }
 
+
+    /// Test loading a binary KeyValue file from disk.
     #[test]
     fn keyval() {
         #[cfg(target_os = "linux")]

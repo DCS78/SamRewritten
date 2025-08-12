@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -14,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Provides raw FFI bindings for the `ISteamUtils` interface vtable.
+//! All functions in this vtable are unsafe and must be called with valid pointers and correct types as expected by the Steamworks API.
 use crate::steam_client::steamworks_types::{
     CSteamID, EFloatingGamepadTextInputMode, EGamepadTextInputLineMode, EGamepadTextInputMode,
     ENotificationPosition, ESteamAPICallFailure, ESteamIPv6ConnectivityProtocol,
@@ -22,6 +23,10 @@ use crate::steam_client::steamworks_types::{
 };
 use std::os::raw::{c_char, c_int, c_void};
 
+/// Raw vtable for the ISteamUtils interface.
+///
+/// # Safety
+/// All function pointers must be called with valid pointers and correct types as expected by the Steamworks API.
 #[repr(C)]
 pub struct ISteamUtilsVTable {
     pub get_seconds_since_app_active: unsafe extern "C" fn(*mut ISteamUtils) -> u32,
@@ -104,9 +109,12 @@ pub struct ISteamUtilsVTable {
     pub dismiss_gamepad_text_input: unsafe extern "C" fn(*mut ISteamUtils) -> bool,
 }
 
+/// Opaque struct representing an ISteamUtils instance.
 #[repr(C)]
 pub struct ISteamUtils {
+    /// Pointer to the vtable for this instance.
     pub vtable: *const ISteamUtilsVTable,
 }
 
+/// The interface version string for ISteamUtils.
 pub const STEAMUTILS_INTERFACE_VERSION: &str = "SteamUtils010\0";

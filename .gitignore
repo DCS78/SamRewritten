@@ -1,4 +1,17 @@
-/target
-*.xml
+# Rust build artifacts
+/target/
+
+# Snapcraft build artifacts
 *.snap
+
+# Editor and OS files
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Project-specific
 icon.png
+
+# XML files (if generated or not needed in VCS)
+*.xml

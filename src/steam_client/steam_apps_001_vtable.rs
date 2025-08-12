@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -17,8 +16,10 @@
 use crate::steam_client::steamworks_types::AppId_t;
 use std::os::raw::{c_char, c_int};
 
+/// VTable for the ISteamApps001 interface (Steam API).
 #[repr(C)]
 pub struct ISteamApps001VTable {
+    /// Gets app data for a given AppId and key.
     pub get_app_data: unsafe extern "C" fn(
         *mut ISteamApps001,
         AppId_t,
@@ -28,11 +29,11 @@ pub struct ISteamApps001VTable {
     ) -> c_int,
 }
 
-// The main interface structure
+/// Opaque ISteamApps001 interface pointer.
 #[repr(C)]
 pub struct ISteamApps001 {
     pub vtable: *const ISteamApps001VTable,
 }
 
-// Interface version constant
+/// The interface version string for ISteamApps001.
 pub const STEAMAPPS001_INTERFACE_VERSION: &str = "STEAMAPPS_INTERFACE_VERSION001\0";

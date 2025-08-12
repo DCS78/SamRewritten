@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -14,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Provides raw FFI bindings for the `ISteamClient` interface vtable.
+//! All functions in this vtable are unsafe and must be called with valid pointers and correct types as expected by the Steamworks API.
 use crate::steam_client::steam_app_list_vtable::ISteamAppList;
 use crate::steam_client::steam_apps_vtable::ISteamApps;
 use crate::steam_client::steam_user_stats_vtable::ISteamUserStats;
@@ -25,11 +26,12 @@ use crate::steam_client::steamworks_types::{
 };
 use std::os::raw::{c_char, c_void};
 
-// Forward declaration...
+/// Opaque struct representing an ISteamGameServer instance.
 #[repr(C)]
 pub struct ISteamGameServer;
 
-// The complete vtable structure
+/// Raw vtable for the ISteamClient interface.
+/// All function pointers must be called with valid pointers and correct types as expected by the Steamworks API.
 #[repr(C)]
 pub struct ISteamClientVTable {
     pub create_steam_pipe: unsafe extern "C" fn(*mut ISteamClient) -> HSteamPipe,
@@ -217,11 +219,12 @@ pub struct ISteamClientVTable {
     pub destroy_all_interfaces: unsafe extern "C" fn(*mut ISteamClient),
 }
 
-// The main interface structure
+/// Opaque struct representing an ISteamClient instance.
 #[repr(C)]
 pub struct ISteamClient {
+    /// Pointer to the vtable for this instance.
     pub vtable: *const ISteamClientVTable,
 }
 
-// Interface version constant
+/// The interface version string for ISteamClient.
 pub const STEAMCLIENT_INTERFACE_VERSION: &str = "SteamClient020\0";

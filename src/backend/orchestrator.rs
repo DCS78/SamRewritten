@@ -13,43 +13,45 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::backend::app_lister::AppLister;
-use crate::backend::connected_steam::ConnectedSteam;
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+    process::Command,
+};
+use interprocess::unnamed_pipe::{Recver, Sender};
+use crate::backend::{
+    app_lister::AppLister,
+    connected_steam::ConnectedSteam,
+};
 #[cfg(debug_assertions)]
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
 use crate::dev_println;
-use crate::utils::app_paths::get_executable_path;
-use crate::utils::bidir_child::BidirChild;
-use crate::utils::ipc_types::{SamError, SamSerializable, SteamCommand, SteamResponse};
-use interprocess::unnamed_pipe::{Recver, Sender};
-use std::collections::HashMap;
-use std::io::Read;
-use std::io::Write;
-use std::process::Command;
+use crate::utils::{
+    app_paths::get_executable_path,
+    bidir_child::BidirChild,
+    ipc_types::{SamError, SamSerializable, SteamCommand, SteamResponse},
+};
 
+/// Sends a command to a child app process and returns the response as bytes.
 fn send_app_command(bidir: &mut BidirChild, command: SteamCommand) -> Vec<u8> {
     let command = command.sam_serialize();
-    let mut buffer_len = [0u8; size_of::<usize>()];
-    bidir.tx.write_all(&command).expect("Send command failed");
+    let mut buffer_len = [0u8; std::mem::size_of::<usize>()];
+    if let Err(e) = bidir.tx.write_all(&command) {
+        eprintln!("[ORCHESTRATOR] Error sending command: {e}");
+        return SteamResponse::<()>::Error(SamError::SocketCommunicationFailed).sam_serialize();
+    }
 
-    match bidir.rx.read_exact(&mut buffer_len) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("[ORCHESTRATOR] Error reading length from pipe: {e}");
-            return SteamResponse::<()>::Error(SamError::SocketCommunicationFailed).sam_serialize();
-        }
+    if let Err(e) = bidir.rx.read_exact(&mut buffer_len) {
+        eprintln!("[ORCHESTRATOR] Error reading length from pipe: {e}");
+        return SteamResponse::<()>::Error(SamError::SocketCommunicationFailed).sam_serialize();
     }
 
     let data_length = usize::from_le_bytes(buffer_len);
     let mut buffer = vec![0u8; data_length];
-
-    match bidir.rx.read_exact(&mut buffer) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("[ORCHESTRATOR] Error reading message from pipe: {e}");
-            return SteamResponse::<()>::Error(SamError::SocketCommunicationFailed).sam_serialize();
-        }
-    };
+    if let Err(e) = bidir.rx.read_exact(&mut buffer) {
+        eprintln!("[ORCHESTRATOR] Error reading message from pipe: {e}");
+        return SteamResponse::<()>::Error(SamError::SocketCommunicationFailed).sam_serialize();
+    }
 
     let mut result = Vec::with_capacity(buffer_len.len() + buffer.len());
     result.extend_from_slice(&buffer_len);
@@ -57,6 +59,7 @@ fn send_app_command(bidir: &mut BidirChild, command: SteamCommand) -> Vec<u8> {
     result
 }
 
+/// Main backend event loop: handles Steam connection, app processes, and command dispatch.
 pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
     let mut connected_steam: Option<ConnectedSteam> = None;
     let mut children_processes: HashMap<u32, BidirChild> = HashMap::new();
@@ -64,15 +67,14 @@ pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
     loop {
         dev_println!("[ORCHESTRATOR] Main loop...");
 
-        let message =
-            SteamCommand::from_recver(parent_rx).expect("[ORCHESTRATOR] No message from pipe");
+        let message = SteamCommand::from_recver(parent_rx)
+            .expect("[ORCHESTRATOR] No message from pipe");
 
         dev_println!("[ORCHESTRATOR] Received message: {message:?}");
 
-        if connected_steam.as_ref().is_none() {
+        if connected_steam.is_none() {
             if message == SteamCommand::Shutdown {
-                let response = SteamResponse::Success(true);
-                let response = response.sam_serialize();
+                let response = SteamResponse::Success(true).sam_serialize();
                 parent_tx
                     .write_all(&response)
                     .expect("[ORCHESTRATOR] Failed to send response");
@@ -95,8 +97,7 @@ pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
             };
         }
 
-        let cs = connected_steam.as_mut();
-        let cs = cs.unwrap();
+        let cs = connected_steam.as_mut().unwrap();
         let continue_running = process_command(message, parent_tx, &mut children_processes, cs);
         if !continue_running {
             break 0;
@@ -104,6 +105,7 @@ pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
     }
 }
 
+/// Handles a single SteamCommand, dispatching to the appropriate logic.
 fn process_command(
     command: SteamCommand,
     tx: &mut Sender,

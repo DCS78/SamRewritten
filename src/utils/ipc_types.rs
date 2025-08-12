@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use interprocess::unnamed_pipe::Recver;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 use std::io::Read;
+use interprocess::unnamed_pipe::Recver;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+/// Error types for orchestrator/app IPC.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SamError {
     SerializationFailed,
@@ -45,6 +45,7 @@ impl std::fmt::Display for SamError {
 
 impl std::error::Error for SamError {}
 
+/// Commands sent from frontend to orchestrator/app.
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SteamCommand {
     GetOwnedAppList,
@@ -61,13 +62,16 @@ pub enum SteamCommand {
     ResetStats(u32, bool),
 }
 
+/// Response from orchestrator/app to frontend.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SteamResponse<T> {
     Success(T),
     Error(SamError),
 }
 
+/// Trait for serializing/deserializing IPC messages with length prefix.
 pub trait SamSerializable {
+    /// Serializes the object to a length-prefixed JSON byte vector.
     fn sam_serialize(&self) -> Vec<u8>
     where
         Self: Sized + Serialize,
@@ -82,16 +86,16 @@ pub trait SamSerializable {
         result
     }
 
+    /// Reads and deserializes a message from a Recver.
     fn from_recver(rx: &mut Recver) -> Result<Self, SamError>
     where
         Self: DeserializeOwned,
     {
-        let mut buffer_len = [0u8; size_of::<usize>()];
+        let mut buffer_len = [0u8; std::mem::size_of::<usize>()];
         match rx.read_exact(&mut buffer_len) {
             Ok(_) => {}
             Err(e) => {
                 eprintln!("[IPC] Error reading length from pipe: {e}");
-                // Does this actually happen and shouldn't we kill our child?
                 return Err(SamError::SocketCommunicationFailed);
             }
         }
@@ -113,8 +117,10 @@ pub trait SamSerializable {
     }
 }
 
+
 impl<T> SamSerializable for SteamResponse<T> where T: Sized + Serialize {}
 impl SamSerializable for SteamCommand {}
+
 
 impl<T> Into<Result<T, SamError>> for SteamResponse<T> {
     fn into(self) -> Result<T, SamError> {

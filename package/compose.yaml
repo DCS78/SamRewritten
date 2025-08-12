@@ -1,18 +1,33 @@
-# Snaps cannot be built inside docker containers since snap requires systemd
+
+# Docker Compose file for building SamRewritten AppImage and ArchLinux packages
+# Note: Snap packages cannot be built inside Docker containers (snap requires systemd)
+
+version: '3.8'
 
 services:
   rust-gtk-appimage:
+    container_name: samrewritten-appimage-builder
     build:
+      context: .
       dockerfile: ./appimage.Dockerfile
     volumes:
       - ../:/mnt:z
-#    command: /bin/bash -c "cargo appimage"
-#    command: /bin/bash -c "appimage --features adwaita"
+    # Uncomment to run build directly:
+    # command: /bin/bash -c "cargo appimage"
+    # command: /bin/bash -c "appimage --features adwaita"
     command: tail -f /dev/null
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
 
   rust-gtk-archlinux:
+    container_name: samrewritten-archlinux-builder
     build:
+      context: .
       dockerfile: ./arch.Dockerfile
     volumes:
       - ../:/mnt:z
     command: tail -f /dev/null
+    tty: true
+    stdin_open: true
+    restart: unless-stopped

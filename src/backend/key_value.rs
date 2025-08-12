@@ -1,34 +1,30 @@
-/* Copyright (c) 2024 Rick (rick 'at' gibbed 'dot' us)
- *
- * This software is provided 'as-is', without any express or implied
- * warranty. In no event will the authors be held liable for any damages
- * arising from the use of this software.
- *
- * Permission is granted to anyone to use this software for any purpose,
- * including commercial applications, and to alter it and redistribute it
- * freely, subject to the following restrictions:
- *
- * 1. The origin of this software must not be misrepresented; you must not
- *    claim that you wrote the original software. If you use this software
- *    in a product, an acknowledgment in the product documentation would
- *    be appreciated but is not required.
- *
- * 2. Altered source versions must be plainly marked as such, and must not
- *    be misrepresented as being the original software.
- *
- * 3. This notice may not be removed or altered from any source
- *    distribution.
- */
-
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt,
+    fs::File,
+    io::{Read, Seek},
+    path::Path,
+    sync::LazyLock,
+};
 use crate::backend::types::KeyValueEncoding;
-use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
-use std::fs::File;
-use std::io::{Read, Seek};
-use std::path::Path;
-use std::sync::LazyLock;
 
+
+/// Errors that can occur when working with KeyValue structures.
 #[derive(Debug)]
 pub enum KeyValueError {
     Io(std::io::Error),
@@ -61,6 +57,8 @@ impl From<std::io::Error> for KeyValueError {
     }
 }
 
+
+/// The type of value stored in a KeyValue node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyValueType {
     None = 0,
@@ -96,6 +94,8 @@ impl TryFrom<u8> for KeyValueType {
     }
 }
 
+
+/// The data held by a KeyValue node.
 #[derive(Debug, Clone)]
 pub enum KeyValueData {
     None,
@@ -106,15 +106,23 @@ pub enum KeyValueData {
     Color(u32),
 }
 
+
+/// A node in a hierarchical key-value tree.
 #[derive(Debug, Clone)]
 pub struct KeyValue {
+    /// The name of this node.
     pub name: String,
+    /// The data stored at this node.
     pub data: KeyValueData,
+    /// Child nodes, if any.
     pub children: HashMap<String, KeyValue>,
+    /// Whether this node is valid.
     pub valid: bool,
 }
 
+
 impl KeyValue {
+    /// Returns a reference to a static invalid KeyValue node.
     fn invalid() -> &'static Self {
         static INVALID: LazyLock<KeyValue> = LazyLock::new(|| KeyValue {
             name: "<invalid>".to_owned(),
@@ -122,10 +130,10 @@ impl KeyValue {
             children: HashMap::new(),
             valid: false,
         });
-
         &INVALID
     }
 
+    /// Creates a new root KeyValue node.
     pub fn root() -> Self {
         Self {
             name: "<root>".to_string(),
@@ -135,16 +143,16 @@ impl KeyValue {
         }
     }
 
+    /// Gets a child node by key, or returns a static invalid node if not found.
     pub fn get(&self, key: &str) -> &KeyValue {
-        // self.children.get(key).cloned().unwrap_or_else(Self::invalid)
-        self.children.get(key).unwrap_or(&Self::invalid())
+        self.children.get(key).unwrap_or(Self::invalid())
     }
 
+    /// Returns the value as a string, or the provided default if invalid.
     pub fn as_string(&self, default: &str) -> String {
         if !self.valid {
             return default.to_string();
         }
-
         match &self.data {
             KeyValueData::String(s) => s.clone(),
             KeyValueData::Int32(i) => i.to_string(),
@@ -155,11 +163,11 @@ impl KeyValue {
         }
     }
 
+    /// Returns the value as an i32, or the provided default if invalid.
     pub fn as_i32(&self, default: i32) -> i32 {
         if !self.valid {
             return default;
         }
-
         match &self.data {
             KeyValueData::String(s) => s.parse().unwrap_or(default),
             KeyValueData::Int32(i) => *i,
@@ -169,11 +177,11 @@ impl KeyValue {
         }
     }
 
+    /// Returns the value as an f32, or the provided default if invalid.
     pub fn as_f32(&self, default: f32) -> f32 {
         if !self.valid {
             return default;
         }
-
         match &self.data {
             KeyValueData::String(s) => s.parse().unwrap_or(default),
             KeyValueData::Int32(i) => *i as f32,
@@ -183,11 +191,11 @@ impl KeyValue {
         }
     }
 
+    /// Returns the value as a bool, or the provided default if invalid.
     pub fn as_bool(&self, default: bool) -> bool {
         if !self.valid {
             return default;
         }
-
         match &self.data {
             KeyValueData::String(s) => s.parse::<i32>().map(|v| v != 0).unwrap_or(default),
             KeyValueData::Int32(i) => *i != 0,
@@ -197,6 +205,7 @@ impl KeyValue {
         }
     }
 
+    /// Loads a KeyValue tree from a binary file.
     pub fn load_as_binary<P: AsRef<Path>>(path: P) -> Result<Self, KeyValueError> {
         let mut file = File::open(path)?;
         let mut kv = Self::root();
@@ -204,6 +213,7 @@ impl KeyValue {
         Ok(kv)
     }
 
+    /// Reads a KeyValue tree from a binary stream.
     pub fn read_as_binary<R: Read + Seek>(&mut self, input: &mut R) -> Result<(), KeyValueError> {
         loop {
             let mut type_byte = [0u8];
@@ -258,13 +268,11 @@ impl KeyValue {
             self.children.insert(current.name.clone(), current);
         }
 
-        // Fuck it
-        // There is no equivalent to C++ istream::peek. No sanity check this time.
-        // I could check the file size and compare cursor position, but not today
-
+        // No equivalent to C++ istream::peek; skipping sanity check.
         Ok(())
     }
 
+    /// Reads a string from a stream with the given encoding and end character.
     fn read_string_internal_dynamic(
         input: &mut dyn Read,
         encoding: KeyValueEncoding,
@@ -312,6 +320,7 @@ impl KeyValue {
         }
     }
 
+    /// Reads a null-terminated UTF-8 string from a stream.
     pub fn read_string_unicode(input: &mut dyn Read) -> Result<String, KeyValueError> {
         Self::read_string_internal_dynamic(input, KeyValueEncoding::Utf8, '\0')
     }
@@ -322,11 +331,9 @@ impl fmt::Display for KeyValue {
         if !self.valid {
             return write!(f, "<invalid>");
         }
-
         if matches!(self.data, KeyValueData::None) && !self.children.is_empty() {
             return write!(f, "{}", self.name);
         }
-
         write!(f, "{} = {}", self.name, self.as_string(""))
     }
 }

@@ -13,26 +13,35 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Provides a safe Rust abstraction over the `ISteamUserStats` FFI interface.
 use crate::steam_client::steam_user_stats_vtable::ISteamUserStats;
 use crate::steam_client::steamworks_types::{CSteamID, SteamAPICall_t};
 use crate::steam_client::wrapper_types::SteamClientError;
 use std::sync::Arc;
 
+/// Safe wrapper for the `ISteamUserStats` interface.
+#[derive(Debug, Clone)]
 pub struct SteamUserStats {
     inner: Arc<SteamUserStatsInner>,
 }
 
+#[derive(Debug)]
 struct SteamUserStatsInner {
     ptr: *mut ISteamUserStats,
 }
 
 impl SteamUserStats {
+    /// Creates a new `SteamUserStats` instance from a raw pointer.
+    ///
+    /// # Safety
+    /// The pointer must be valid and remain valid for the lifetime of the `SteamUserStats` instance.
     pub unsafe fn from_raw(ptr: *mut ISteamUserStats) -> Self {
         Self {
             inner: Arc::new(SteamUserStatsInner { ptr }),
         }
     }
 
+    /// Gets whether an achievement is unlocked and its unlock time.
     pub fn get_achievement_and_unlock_time(
         &self,
         achievement_name: &str,
@@ -63,6 +72,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Unlocks an achievement.
     pub fn set_achievement(&self, achievement_name: &str) -> Result<(), SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -83,6 +93,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Clears (locks) an achievement.
     pub fn clear_achievement(&self, achievement_name: &str) -> Result<(), SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -103,6 +114,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Gets a 32-bit integer stat value.
     pub fn get_stat_i32(&self, stat_name: &str) -> Result<i32, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -117,7 +129,7 @@ impl SteamUserStats {
             let success =
                 (vtable.get_stat_int32)(self.inner.ptr, c_stat_name.as_ptr(), &mut stat_value);
 
-            if success == false {
+            if !success {
                 return Err(SteamClientError::UnknownError);
             }
 
@@ -125,6 +137,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Gets a floating-point stat value.
     pub fn get_stat_float(&self, stat_name: &str) -> Result<f32, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -139,7 +152,7 @@ impl SteamUserStats {
             let success =
                 (vtable.get_stat_float)(self.inner.ptr, c_stat_name.as_ptr(), &mut stat_value);
 
-            if success == false {
+            if !success {
                 return Err(SteamClientError::UnknownError);
             }
 
@@ -147,6 +160,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Sets a 32-bit integer stat value.
     pub fn set_stat_i32(&self, stat_name: &str, stat_value: i32) -> Result<i32, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -159,7 +173,7 @@ impl SteamUserStats {
 
             let success = (vtable.set_stat_int32)(self.inner.ptr, c_stat_name.as_ptr(), stat_value);
 
-            if success == false {
+            if !success {
                 return Err(SteamClientError::UnknownError);
             }
 
@@ -167,6 +181,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Sets a floating-point stat value.
     pub fn set_stat_float(
         &self,
         stat_name: &str,
@@ -183,7 +198,7 @@ impl SteamUserStats {
 
             let success = (vtable.set_stat_float)(self.inner.ptr, c_stat_name.as_ptr(), stat_value);
 
-            if success == false {
+            if !success {
                 return Err(SteamClientError::UnknownError);
             }
 
@@ -191,6 +206,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Requests global achievement percentages.
     pub fn request_global_achievement_percentages(
         &self,
     ) -> Result<SteamAPICall_t, SteamClientError> {
@@ -210,6 +226,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Requests user stats for a given Steam ID.
     pub fn request_user_stats(
         &self,
         steam_id: CSteamID,
@@ -230,6 +247,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Stores the current stats on Steam.
     pub fn store_stats(&self) -> Result<bool, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -243,6 +261,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Resets all stats, optionally including achievements.
     pub fn reset_all_stats(&self, achievements_too: bool) -> Result<bool, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -256,6 +275,7 @@ impl SteamUserStats {
         }
     }
 
+    /// Gets the achieved percent for a given achievement.
     pub fn get_achievement_achieved_percent(
         &self,
         achievement_name: &str,

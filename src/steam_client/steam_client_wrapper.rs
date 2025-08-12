@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+
+//! Provides a safe Rust abstraction over the `ISteamClient` FFI interface.
 use crate::steam_client::steam_apps_001_vtable::{ISteamApps001, STEAMAPPS001_INTERFACE_VERSION};
 use crate::steam_client::steam_apps_001_wrapper::SteamApps001;
 use crate::steam_client::steam_apps_vtable::STEAMAPPS_INTERFACE_VERSION;
@@ -32,15 +34,20 @@ use libloading::Symbol;
 use std::os::raw::c_char;
 use std::sync::Arc;
 
+/// Safe wrapper for the `ISteamClient` interface.
+#[derive(Debug, Clone)]
 pub struct SteamClient {
     inner: Arc<SteamClientInner>,
 }
 
+#[derive(Debug)]
 struct SteamClientInner {
     ptr: *mut ISteamClient,
 }
 
 impl<'a> SteamClient {
+    /// Creates a new `SteamClient` instance from a raw pointer and callback symbols.
+    /// The pointer must be valid and remain valid for the lifetime of the `SteamClient` instance.
     pub unsafe fn from_raw(
         ptr: *mut ISteamClient,
         _callback_fn: Symbol<'a, SteamGetCallbackFn>,
@@ -54,6 +61,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Creates a new Steam pipe and returns its handle.
+    /// Returns `SteamClientError` if the vtable is null or pipe creation fails.
     pub fn create_steam_pipe(&self) -> Result<HSteamPipe, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -69,6 +78,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Releases a Steam pipe.
+    /// Returns `SteamClientError` if the vtable is null or pipe release fails.
     pub fn release_steam_pipe(&self, pipe: HSteamPipe) -> Result<bool, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -84,6 +95,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Releases a Steam user from a pipe.
+    /// Panics if the vtable pointer is null.
     pub fn release_user(&self, pipe: HSteamPipe, user: HSteamUser) {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -94,6 +107,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Connects to the global user for a given pipe.
+    /// Returns `SteamClientError` if the vtable is null or user connection fails.
     pub fn connect_to_global_user(&self, pipe: HSteamPipe) -> Result<HSteamUser, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -109,6 +124,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Shuts down the client if all app pipes are closed.
+    /// Returns `SteamClientError` if the vtable is null.
     pub fn shutdown_if_app_pipes_closed(&self) -> Result<bool, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -119,6 +136,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Gets the `ISteamApps` interface for the given user and pipe.
+    /// Returns `SteamClientError` if the vtable is null or interface creation fails.
     pub fn get_isteam_apps(
         &self,
         user: HSteamUser,
@@ -143,6 +162,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Gets the `ISteamApps001` interface for the given user and pipe.
+    /// Returns `SteamClientError` if the vtable is null or interface creation fails.
     pub fn get_isteam_apps_001(
         &self,
         user: HSteamUser,
@@ -167,6 +188,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Gets the `ISteamUtils` interface for the given pipe.
+    /// Returns `SteamClientError` if the vtable is null or interface creation fails.
     pub fn get_isteam_utils(&self, pipe: HSteamPipe) -> Result<SteamUtils, SteamClientError> {
         unsafe {
             let version = STEAMUTILS_INTERFACE_VERSION.as_ptr() as *const c_char;
@@ -187,6 +210,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Gets the `ISteamUserStats` interface for the given user and pipe.
+    /// Returns `SteamClientError` if the vtable is null or interface creation fails.
     pub fn get_isteam_user_stats(
         &self,
         user: HSteamUser,
@@ -212,6 +237,8 @@ impl<'a> SteamClient {
         }
     }
 
+    /// Gets the `ISteamUser` interface for the given user and pipe.
+    /// Returns `SteamClientError` if the vtable is null or interface creation fails.
     pub fn get_isteam_user(
         &self,
         user: HSteamUser,

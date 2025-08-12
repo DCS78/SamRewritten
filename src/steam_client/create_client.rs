@@ -13,18 +13,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::steam_client::steam_client_vtable::{ISteamClient, STEAMCLIENT_INTERFACE_VERSION};
-use crate::steam_client::steam_client_wrapper::SteamClient;
-use crate::steam_client::steamworks_types::{
-    CreateInterfaceFn, SteamFreeLastCallbackFn, SteamGetCallbackFn,
-};
-use crate::utils::app_paths::get_steamclient_lib_path;
-use libloading::{Library, Symbol};
 use std::os::raw::c_char;
 use std::sync::OnceLock;
+use libloading::{Library, Symbol};
+use crate::steam_client::{
+    steam_client_vtable::{ISteamClient, STEAMCLIENT_INTERFACE_VERSION},
+    steam_client_wrapper::SteamClient,
+    steamworks_types::{CreateInterfaceFn, SteamFreeLastCallbackFn, SteamGetCallbackFn},
+};
+use crate::utils::app_paths::get_steamclient_lib_path;
 
 static STEAM_CLIENT_LIB: OnceLock<Library> = OnceLock::new(); // Make the lifetime 'static
 
+
+/// Loads the Steam client library (Linux).
 #[cfg(target_os = "linux")]
 pub fn load_steamclient_library() -> Result<Library, Box<dyn std::error::Error>> {
     unsafe {
@@ -34,6 +36,7 @@ pub fn load_steamclient_library() -> Result<Library, Box<dyn std::error::Error>>
     }
 }
 
+/// Loads the Steam client library (Windows).
 #[cfg(target_os = "windows")]
 pub fn load_steamclient_library() -> Result<Library, Box<dyn std::error::Error>> {
     use libloading::os::windows::{
@@ -50,6 +53,7 @@ pub fn load_steamclient_library() -> Result<Library, Box<dyn std::error::Error>>
     }
 }
 
+/// Creates a new ISteamClient interface and retrieves callback function pointers.
 pub fn new_steam_client_interface(
     steamclient_so: &Library,
 ) -> Result<
@@ -90,18 +94,15 @@ pub fn new_steam_client_interface(
     }
 }
 
+/// Loads the Steam client library and creates a new SteamClient wrapper.
 pub fn create_steam_client() -> Result<SteamClient, Box<dyn std::error::Error>> {
     if STEAM_CLIENT_LIB.get().is_none() {
         let steamclient_so = load_steamclient_library()?;
-        match STEAM_CLIENT_LIB.set(steamclient_so) {
-            Ok(_) => {}
-            Err(_) => panic!("Failed to create steam client"),
-        };
+        STEAM_CLIENT_LIB.set(steamclient_so).map_err(|_| "Failed to create steam client")?;
     }
 
     let (raw_client, callback_fn, free_callback_fn) =
-        new_steam_client_interface(&STEAM_CLIENT_LIB.get().unwrap())?;
+        new_steam_client_interface(STEAM_CLIENT_LIB.get().unwrap())?;
     let client = unsafe { SteamClient::from_raw(raw_client, callback_fn, free_callback_fn) };
-
     Ok(client)
 }

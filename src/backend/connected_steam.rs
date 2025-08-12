@@ -13,15 +13,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::steam_client::create_client::create_steam_client;
-use crate::steam_client::steam_apps_001_wrapper::SteamApps001;
-use crate::steam_client::steam_apps_wrapper::SteamApps;
-use crate::steam_client::steam_client_wrapper::SteamClient;
-use crate::steam_client::steam_user_stats_wrapper::SteamUserStats;
-use crate::steam_client::steam_user_wrapper::SteamUser;
-use crate::steam_client::steam_utils_wrapper::SteamUtils;
-use crate::steam_client::steamworks_types::{HSteamPipe, HSteamUser};
+use crate::steam_client::{
+    create_client::create_steam_client,
+    steam_apps_001_wrapper::SteamApps001,
+    steam_apps_wrapper::SteamApps,
+    steam_client_wrapper::SteamClient,
+    steam_user_stats_wrapper::SteamUserStats,
+    steam_user_wrapper::SteamUser,
+    steam_utils_wrapper::SteamUtils,
+    steamworks_types::{HSteamPipe, HSteamUser},
+};
 
+/// Manages a live connection to the Steam client and interfaces.
+#[derive(Debug)]
 pub struct ConnectedSteam {
     h_pipe: HSteamPipe,
     h_user: HSteamUser,
@@ -33,7 +37,8 @@ pub struct ConnectedSteam {
     pub user: SteamUser,
 }
 
-impl<'a> ConnectedSteam {
+impl ConnectedSteam {
+    /// Create a new live connection to the Steam client and interfaces.
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let client = create_steam_client()?;
         let h_pipe = client.create_steam_pipe()?;
@@ -44,7 +49,7 @@ impl<'a> ConnectedSteam {
         let user_stats = client.get_isteam_user_stats(h_user, h_pipe)?;
         let user = client.get_isteam_user(h_user, h_pipe)?;
 
-        Ok(ConnectedSteam {
+        Ok(Self {
             h_pipe,
             h_user,
             client,
@@ -56,6 +61,7 @@ impl<'a> ConnectedSteam {
         })
     }
 
+    /// Cleanly shut down the Steam connection and release resources.
     pub fn shutdown(&self) {
         self.client.release_user(self.h_pipe, self.h_user);
         self.client
