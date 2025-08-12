@@ -22,6 +22,7 @@ glib::wrapper! {
 }
 
 impl GStatObject {
+    /// Create a new GStatObject from StatInfo.
     pub fn new(info: StatInfo) -> Self {
         match info {
             StatInfo::Float(info) => Object::builder()
@@ -55,30 +56,24 @@ mod imp {
     use gtk::subclass::prelude::*;
     use std::cell::{Cell, RefCell};
 
+    /// Internal implementation of GStatObject properties.
     #[derive(Properties, Default)]
     #[properties(wrapper_type = super::GStatObject)]
     pub struct GStatObject {
         #[property(get, set)]
         id: RefCell<String>,
-
         #[property(get, set)]
         display_name: RefCell<String>,
-
         #[property(get, set)]
         original_value: Cell<f64>,
-
         #[property(get, set)]
         current_value: Cell<f64>,
-
         #[property(get, set)]
         is_integer: Cell<bool>,
-
         #[property(get, set)]
         is_increment_only: Cell<bool>,
-
         #[property(get, set)]
         app_id: Cell<u32>,
-
         #[property(get, set)]
         permission: Cell<i32>,
     }

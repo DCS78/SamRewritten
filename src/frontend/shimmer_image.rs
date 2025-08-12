@@ -23,12 +23,14 @@ glib::wrapper! {
 }
 
 impl ShimmerImage {
+    /// Create a new ShimmerImage widget.
     pub fn new() -> Self {
         glib::Object::builder()
             .property("url", None::<String>)
             .build()
     }
 
+    /// Reset the image state and mark as failed.
     pub fn reset(&self) {
         self.imp().url.borrow_mut().take();
         self.imp().texture.borrow_mut().take();
@@ -55,6 +57,7 @@ mod imp {
     const BASE_COLOR: RGBA = RGBA::new(0.7, 0.7, 0.7, 1.0);
     const HIGHLIGHT_COLOR: RGBA = RGBA::new(0.8, 0.8, 0.8, 1.0);
 
+    /// Internal implementation of ShimmerImage properties and state.
     #[derive(Default, Properties)]
     #[properties(wrapper_type = super::ShimmerImage)]
     pub struct ShimmerImage {

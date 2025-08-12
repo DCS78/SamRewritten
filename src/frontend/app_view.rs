@@ -31,6 +31,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
+/// Create the main app view, including sidebar, achievements, and stats.
 pub fn create_app_view(
     app_id: Rc<Cell<Option<u32>>>,
     app_unlocked_achievements_count: Rc<Cell<usize>>,
@@ -229,22 +230,23 @@ pub fn create_app_view(
         #[weak]
         app_stats_button,
         move |stack| {
-            if stack.visible_child_name().as_deref() == Some("loading") {
-                app_achievements_button.set_sensitive(false);
-                app_stats_button.set_sensitive(false);
-            } else if stack.visible_child_name().as_deref() == Some("failed") {
-                app_achievements_button.set_sensitive(false);
-                app_stats_button.set_sensitive(false);
-            } else if stack.visible_child_name().as_deref() == Some("achievements") {
-                app_achievements_button.set_active(true);
-                app_stats_button.set_active(false);
-                app_achievements_button.set_sensitive(true);
-                app_stats_button.set_sensitive(true);
-            } else {
-                app_achievements_button.set_active(false);
-                app_stats_button.set_active(true);
-                app_achievements_button.set_sensitive(true);
-                app_stats_button.set_sensitive(true);
+            match stack.visible_child_name().as_deref() {
+                Some("loading") | Some("failed") => {
+                    app_achievements_button.set_sensitive(false);
+                    app_stats_button.set_sensitive(false);
+                }
+                Some("achievements") => {
+                    app_achievements_button.set_active(true);
+                    app_stats_button.set_active(false);
+                    app_achievements_button.set_sensitive(true);
+                    app_stats_button.set_sensitive(true);
+                }
+                _ => {
+                    app_achievements_button.set_active(false);
+                    app_stats_button.set_active(true);
+                    app_achievements_button.set_sensitive(true);
+                    app_stats_button.set_sensitive(true);
+                }
             }
         }
     ));

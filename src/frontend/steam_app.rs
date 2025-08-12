@@ -24,8 +24,9 @@ glib::wrapper! {
 }
 
 impl GSteamAppObject {
+    /// Create a new GSteamAppObject from an AppModel.
     pub fn new(app: AppModel) -> Self {
-        // We are client code. If a local image is already present, do not use the remote one.
+        // Prefer local image if available, otherwise use remote.
         let local_banner_path = get_local_app_banner_file_path(&app.app_id);
         let image_url = if let Ok(path) = local_banner_path {
             if Path::new(&path).exists() {
@@ -55,24 +56,20 @@ mod imp {
     use gtk::subclass::prelude::*;
     use std::cell::{Cell, RefCell};
 
+    /// Internal implementation of GSteamAppObject properties.
     #[derive(Properties, Default)]
     #[properties(wrapper_type = super::GSteamAppObject)]
     pub struct GSteamAppObject {
         #[property(get, set)]
         app_id: Cell<u32>,
-
         #[property(get, set)]
         app_name: RefCell<String>,
-
         #[property(get, set)]
         developer: RefCell<String>,
-
         #[property(get, set)]
         metacritic_score: Cell<u8>,
-
         #[property(get, set)]
         image_url: RefCell<Option<String>>,
-
         #[property(get, set)]
         app_type: RefCell<String>,
     }

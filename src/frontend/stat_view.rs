@@ -27,6 +27,7 @@ use gtk::{
 use glib::prelude::ToValue;
 use std::{cell::RefCell, ffi::c_ulong, sync::mpsc::channel, time::Duration};
 
+/// Create the stats view, including model, filter, and UI.
 pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
     let stats_list_factory = SignalListItemFactory::new();
     let app_stats_model = ListStore::new::<GStatObject>();

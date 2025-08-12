@@ -16,6 +16,7 @@
 use crate::{dev_println, frontend::MainApplication};
 use gtk::{AboutDialog, gio::SimpleAction, prelude::*};
 
+/// Set up application actions and keyboard shortcuts.
 pub fn setup_app_actions(
     application: &MainApplication,
     about_dialog: &AboutDialog,
@@ -55,6 +56,7 @@ pub fn setup_app_actions(
     }
 }
 
+/// Enable or disable a named application action.
 pub fn set_app_action_enabled(application: &MainApplication, action_name: &str, enabled: bool) {
     match application.lookup_action(action_name) {
         Some(action) => {
@@ -64,7 +66,7 @@ pub fn set_app_action_enabled(application: &MainApplication, action_name: &str, 
                 dev_println!("[CLIENT] Action '{action_name}' is not a SimpleAction");
             }
         }
-        None => {
+        none => {
             dev_println!("[CLIENT] Action not found: {action_name}");
         }
     }

@@ -1,3 +1,4 @@
+use gtk::glib;
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -29,6 +30,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
+/// Create the achievements view stack, models, and controls.
 pub fn create_achievements_view(
     app_id: Rc<Cell<Option<u32>>>,
     app_unlocked_achievements_count: Rc<Cell<usize>>,
@@ -51,6 +53,7 @@ pub fn create_achievements_view(
         .match_mode(StringFilterMatchMode::Substring)
         .ignore_case(true)
         .build();
+
     let app_achievement_filter_model = FilterListModel::builder()
         .model(&app_achievements_model)
         .filter(&app_achievement_string_filter)
@@ -60,13 +63,11 @@ pub fn create_achievements_view(
         .filter(&app_achievement_string_filter)
         .build();
 
-    let global_achieved_percent_sorter = CustomSorter::new(move |obj1, obj2| {
+    let global_achieved_percent_sorter = CustomSorter::new(|obj1, obj2| {
         let achievement1 = obj1.downcast_ref::<GAchievementObject>().unwrap();
         let achievement2 = obj2.downcast_ref::<GAchievementObject>().unwrap();
-
         let percent1 = achievement1.global_achieved_percent();
         let percent2 = achievement2.global_achieved_percent();
-
         percent2
             .partial_cmp(&percent1)
             .unwrap_or(Ordering::Equal)
@@ -85,6 +86,7 @@ pub fn create_achievements_view(
     let achievement_views_stack = Stack::builder()
         .transition_type(StackTransitionType::SlideLeftRight)
         .build();
+
     let (
         achievements_manual_frame,
         achievements_manual_adjustment,
@@ -118,17 +120,19 @@ pub fn create_achievements_view(
     )
 }
 
+/// Count the number of unlocked achievements in the given model.
 pub fn count_unlocked_achievements(model: &ListStore) -> u32 {
-    let mut count = 0;
-    for ach in model {
-        if let Ok(obj) = ach {
-            let g_achievement = obj
-                .downcast::<GAchievementObject>()
-                .expect("Not a GAchievementObject");
-            if g_achievement.is_achieved() {
-                count += 1;
-            }
-        }
-    }
-    count
+    model
+        .iter()
+        .filter_map(|ach| {
+            ach.ok().and_then(|obj: glib::Object| {
+                let g_achievement = obj.downcast::<GAchievementObject>().ok()?;
+                if g_achievement.is_achieved() {
+                    Some(())
+                } else {
+                    None
+                }
+            })
+        })
+        .count() as u32
 }

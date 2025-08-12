@@ -23,6 +23,7 @@ use gtk::{
 };
 use std::io::Cursor;
 
+/// Create the About dialog for the application.
 pub fn create_about_dialog(window: &ApplicationWindow) -> AboutDialog {
     let logo = load_logo();
     AboutDialog::builder()
@@ -32,12 +33,13 @@ pub fn create_about_dialog(window: &ApplicationWindow) -> AboutDialog {
         .license_type(License::Gpl30)
         .version(env!("CARGO_PKG_VERSION"))
         .program_name("SamRewritten")
-    .authors(env!("CARGO_PKG_AUTHORS").replace(" -@- ", "@").split(':').collect::<Vec<_>>())
+        .authors(env!("CARGO_PKG_AUTHORS").replace(" -@- ", "@").split(':').collect::<Vec<_>>())
         .comments(env!("CARGO_PKG_DESCRIPTION"))
         .logo(&logo)
         .build()
 }
 
+/// Load the application logo as a Paintable.
 pub fn load_logo() -> Paintable {
     let image_bytes = include_bytes!("../../assets/icon_256.png");
     use gtk::gdk::Texture;
@@ -52,17 +54,13 @@ pub fn load_logo() -> Paintable {
     }
 }
 
+/// Create a context menu button with a popover and menu model.
 pub fn create_context_menu_button() -> (MenuButton, PopoverMenu, gtk::gio::Menu) {
     let menu_button = MenuButton::builder()
         .icon_name("open-menu-symbolic")
         .build();
 
     let context_menu_model = gtk::gio::Menu::new();
-
-    // Let's remember we can add sections, but for now I don't see the use case
-    // let section = gio::Menu::new();
-    // section.append(Some("Sub Item A"), Some("app.subitemA"));
-    // menu.append_section(Some("Section"), &section);
     context_menu_model.append(Some("Refresh app list"), Some("app.refresh_app_list"));
     context_menu_model.append(Some("About"), Some("app.about"));
     context_menu_model.append(Some("Quit"), Some("app.quit"));
@@ -78,6 +76,7 @@ pub fn create_context_menu_button() -> (MenuButton, PopoverMenu, gtk::gio::Menu)
     (menu_button, popover, context_menu_model)
 }
 
+/// Set the context popover to the app list context.
 pub fn set_context_popover_to_app_list_context(
     menu_model: &gtk::gio::Menu,
     application: &MainApplication,
@@ -86,10 +85,10 @@ pub fn set_context_popover_to_app_list_context(
     menu_model.append(Some("Refresh app list"), Some("app.refresh_app_list"));
     menu_model.append(Some("About"), Some("app.about"));
     menu_model.append(Some("Quit"), Some("app.quit"));
-
     set_app_action_enabled(&application, "refresh_achievements_list", false);
 }
 
+/// Set the context popover to the app details context.
 pub fn set_context_popover_to_app_details_context(
     menu_model: &gtk::gio::Menu,
     application: &MainApplication,
@@ -105,6 +104,5 @@ pub fn set_context_popover_to_app_details_context(
     );
     menu_model.append(Some("About"), Some("app.about"));
     menu_model.append(Some("Quit"), Some("app.quit"));
-
     set_app_action_enabled(&application, "refresh_app_list", false);
 }

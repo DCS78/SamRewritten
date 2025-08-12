@@ -22,6 +22,7 @@ use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 
+/// Trait for sending a request to the orchestrator and receiving a typed response.
 pub trait Request: Into<SteamCommand> + Debug + Clone {
     type Response: DeserializeOwned;
 
@@ -29,30 +30,21 @@ pub trait Request: Into<SteamCommand> + Debug + Clone {
         let mut guard = DEFAULT_PROCESS.write().unwrap();
         if let Some(ref mut bidir) = *guard {
             let command: SteamCommand = self.clone().into();
-
             dev_println!("[CLIENT] Sending command: {:?}", command);
-
             let command = command.sam_serialize();
-
             bidir.tx.write_all(&command).unwrap();
 
-            // Skill issue
-            // let response: SteamResponse<Self::Response> = SteamResponse::from_recver(&mut bidir.rx).expect("Send command failed");
-
-            let mut buffer_len = [0u8; size_of::<usize>()];
-
+            let mut buffer_len = [0u8; std::mem::size_of::<usize>()];
             match bidir.rx.read_exact(&mut buffer_len) {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("[CLIENT] Error reading length from pipe: {e}");
-                    // Does this actually happen? We should kill the child or something instead
                     return Err(SamError::SocketCommunicationFailed);
                 }
             }
 
             let data_length = usize::from_le_bytes(buffer_len);
             let mut buffer = vec![0u8; data_length];
-
             match bidir.rx.read_exact(&mut buffer) {
                 Ok(_) => {}
                 Err(e) => {
@@ -62,7 +54,6 @@ pub trait Request: Into<SteamCommand> + Debug + Clone {
             };
 
             let message = String::from_utf8_lossy(&buffer);
-
             serde_json::from_str::<SteamResponse<Self::Response>>(&message)
                 .map_err(|error| {
                     eprintln!("[CLIENT] Response deserialization failed: {error}");
@@ -76,35 +67,43 @@ pub trait Request: Into<SteamCommand> + Debug + Clone {
     }
 }
 
+/// Request to get the list of owned apps.
 #[derive(Debug, Clone)]
 pub struct GetOwnedAppList;
 
+/// Request to shut down the orchestrator.
 #[derive(Debug, Clone)]
 pub struct Shutdown;
 
+/// Request to launch an app by app_id.
 #[derive(Debug, Clone)]
 pub struct LaunchApp {
     pub app_id: u32,
 }
 
+/// Request to stop a specific app by app_id.
 #[derive(Debug, Clone)]
 pub struct StopApp {
     pub app_id: u32,
 }
 
+/// Request to stop all running apps.
 #[derive(Debug, Clone)]
 pub struct StopApps;
 
+/// Request to get achievements for an app.
 #[derive(Debug, Clone)]
 pub struct GetAchievements {
     pub app_id: u32,
 }
 
+/// Request to get stats for an app.
 #[derive(Debug, Clone)]
 pub struct GetStats {
     pub app_id: u32,
 }
 
+/// Request to set an achievement's unlocked state.
 #[derive(Debug, Clone)]
 pub struct SetAchievement {
     pub app_id: u32,
@@ -112,6 +111,7 @@ pub struct SetAchievement {
     pub unlocked: bool,
 }
 
+/// Request to set an integer stat value.
 #[derive(Debug, Clone)]
 pub struct SetIntStat {
     pub app_id: u32,
@@ -119,6 +119,7 @@ pub struct SetIntStat {
     pub value: i32,
 }
 
+/// Request to set a float stat value.
 #[derive(Debug, Clone)]
 pub struct SetFloatStat {
     pub app_id: u32,
@@ -126,6 +127,7 @@ pub struct SetFloatStat {
     pub value: f32,
 }
 
+/// Request to reset stats (and optionally achievements) for an app.
 #[derive(Debug, Clone)]
 pub struct ResetStats {
     pub app_id: u32,

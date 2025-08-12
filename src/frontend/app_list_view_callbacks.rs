@@ -27,7 +27,7 @@ use gtk::{Box, Label, Stack};
 use std::cell::Cell;
 use std::rc::Rc;
 
-#[inline]
+/// Switches the UI from the app list to the app details view and launches the app.
 pub(crate) fn switch_from_app_list_to_app(
     steam_app_object: &GSteamAppObject,
     application: MainApplication,
@@ -86,7 +86,6 @@ pub(crate) fn switch_from_app_list_to_app(
 
         set_app_action_enabled(&application, "refresh_achievements_list", true);
         set_app_action_enabled(&application, "clear_all_stats_and_achievements", true);
-
         application.activate_action("refresh_achievements_list", None);
     }));
 

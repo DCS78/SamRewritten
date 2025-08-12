@@ -26,7 +26,7 @@ use crate::frontend::request::Request;
 use crate::utils::bidir_child::BidirChild;
 use app_list_view::create_main_ui;
 
-// --- Global State ---
+/// Global state for the orchestrator process.
 pub static DEFAULT_PROCESS: Lazy<RwLock<Option<BidirChild>>> = Lazy::new(|| RwLock::new(None));
 
 // --- Module Declarations (alphabetical) ---
@@ -49,6 +49,7 @@ mod ui_components;
 // --- Main Application Logic ---
 use request::Shutdown;
 
+/// Gracefully shut down the orchestrator process.
 fn shutdown() {
     if let Err(err) = Shutdown.request() {
         eprintln!("[CLIENT] Failed to send shutdown message: {}", err);
@@ -59,7 +60,7 @@ fn shutdown() {
         Some(bidir) => {
             bidir.child.wait().expect("[CLIENT] Failed to wait on orchestrator to shutdown");
         }
-        None => panic!("[CLIENT] No orchestrator process to shutdown"),
+        none => panic!("[CLIENT] No orchestrator process to shutdown"),
     }
 }
 
@@ -68,6 +69,7 @@ pub type MainApplication = gtk::Application;
 #[cfg(feature = "adwaita")]
 pub type MainApplication = adw::Application;
 
+/// Entry point for the main UI, sets up the application and event loop.
 pub fn main_ui(orchestrator: BidirChild) -> ExitCode {
     *DEFAULT_PROCESS.write().unwrap() = Some(orchestrator);
     let main_app = MainApplication::builder()

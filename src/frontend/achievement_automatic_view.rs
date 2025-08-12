@@ -17,16 +17,17 @@ use crate::frontend::MainApplication;
 use crate::frontend::achievement::GAchievementObject;
 use crate::frontend::custom_progress_bar_widget::CustomProgressBar;
 use crate::frontend::shimmer_image::ShimmerImage;
-use gtk::glib::clone;
+use gtk::glib::{self, clone};
+use gtk::ClosureExpression;
 use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
 use gtk::{
-    Align, Box, Button, ClosureExpression, Frame, Label, ListBox, ListBoxRow, ListView,
+    Align, Box, Button, Frame, Label, ListBox, ListBoxRow, ListView,
     NoSelection, Orientation, ScrolledWindow, SelectionMode, SignalListItemFactory, Stack,
-    StackTransitionType, Widget, glib,
+    StackTransitionType, Widget,
 };
 
-#[inline]
+/// Create the header for the automatic achievements view.
 fn create_header(application: &MainApplication) -> (ListBox, Button) {
     let list = ListBox::builder()
         .selection_mode(SelectionMode::None)
@@ -40,13 +41,10 @@ fn create_header(application: &MainApplication) -> (ListBox, Button) {
     hbox.append(&button_stop);
     hbox.append(&label);
 
-    button_stop.connect_clicked(clone!(
-        #[weak]
-        application,
-        move |_| {
-            application.activate_action("refresh_achievements_list", None);
-        }
-    ));
+    let application = application.clone();
+    button_stop.connect_clicked(move |_| {
+        application.activate_action("refresh_achievements_list", None);
+    });
 
     let list_box_row = ListBoxRow::builder()
         .child(&hbox)
@@ -62,7 +60,7 @@ fn create_header(application: &MainApplication) -> (ListBox, Button) {
     (list, button_stop)
 }
 
-#[inline]
+/// Create the automatic achievements view.
 pub fn create_achievements_automatic_view(
     timed_filtered_model: &NoSelection,
     application: &MainApplication,
@@ -82,114 +80,9 @@ pub fn create_achievements_automatic_view(
         .build();
 
     achievements_list_factory.connect_setup(move |_, list_item| {
-        let normal_icon = ShimmerImage::new();
-        normal_icon.set_size_request(32, 32);
-        let locked_icon = ShimmerImage::new();
-        locked_icon.set_size_request(32, 32);
-
-        let icon_stack = Stack::builder()
-            .transition_type(StackTransitionType::RotateLeftRight)
-            .build();
-        icon_stack.add_named(&normal_icon, Some("normal"));
-        icon_stack.add_named(&locked_icon, Some("locked"));
-
-        let icon_box = Box::builder()
-            .orientation(Orientation::Vertical)
-            .halign(Align::Start)
-            .margin_end(8)
-            .build();
-        icon_box.append(&icon_stack);
-
-        let spacer = Box::builder()
-            .orientation(Orientation::Horizontal)
-            .hexpand(true)
-            .build();
-        let name_label = Label::builder()
-            .ellipsize(EllipsizeMode::End)
-            .halign(Align::Start)
-            .build();
-        let description_label = Label::builder()
-            .ellipsize(EllipsizeMode::End)
-            .halign(Align::Start)
-            .build();
-        let remaining_time_label = Label::builder().build();
-        let label_box = Box::builder().orientation(Orientation::Vertical).build();
-        let global_percentage_progress_bar = CustomProgressBar::new();
-        global_percentage_progress_bar.set_height_request(2);
-        label_box.append(&name_label);
-        label_box.append(&description_label);
-        let entry_box = Box::builder().orientation(Orientation::Vertical).build();
-        let achievement_box = Box::builder()
-            .orientation(Orientation::Horizontal)
-            .margin_top(8)
-            .margin_bottom(8)
-            .margin_start(8)
-            .margin_end(8)
-            .build();
-        achievement_box.append(&icon_box);
-        achievement_box.append(&label_box);
-        achievement_box.append(&spacer);
-        achievement_box.append(&remaining_time_label);
-        entry_box.append(&achievement_box);
-        entry_box.append(&global_percentage_progress_bar);
-        let list_item = list_item
-            .downcast_ref::<gtk::ListItem>()
-            .expect("list_item must be a ListItem");
-        list_item.set_child(Some(&entry_box));
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("name")
-            .bind(&name_label, "label", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("description")
-            .bind(&description_label, "label", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("icon-normal")
-            .bind(&normal_icon, "url", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("icon-locked")
-            .bind(&locked_icon, "url", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("global-achieved-percent")
-            .bind(&global_percentage_progress_bar, "value", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("global-achieved-percent-ok")
-            .bind(&global_percentage_progress_bar, "visible", Widget::NONE);
-
-        list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("time-until-unlock")
-            .bind(&remaining_time_label, "label", Widget::NONE);
-
-        // Custom expressions
-        let is_achieved_expr = list_item
-            .property_expression("item")
-            .chain_property::<GAchievementObject>("is-achieved");
-
-        let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-            let is_achieved = values
-                .get(1)
-                .and_then(|val| val.get::<bool>().ok())
-                .unwrap_or(false);
-            let child_name = if is_achieved { "normal" } else { "locked" };
-            Some(child_name.to_value())
-        });
-
-        let visible_child_expr =
-            ClosureExpression::new::<String>(&[is_achieved_expr], achieved_visible_icon_closure);
-
-        visible_child_expr.bind(&icon_stack, "visible-child-name", Widget::NONE);
+        if let Some(list_item) = list_item.downcast_ref::<gtk::ListItem>() {
+            setup_achievement_list_item(list_item);
+        }
     });
 
     let vbox = Box::new(Orientation::Vertical, 5);
@@ -204,4 +97,113 @@ pub fn create_achievements_automatic_view(
         .build();
 
     (app_achievements_frame, header_achievements_stop)
+}
+
+/// Helper to setup a list item row for the automatic achievements view.
+fn setup_achievement_list_item(list_item: &gtk::ListItem) {
+    let normal_icon = ShimmerImage::new();
+    normal_icon.set_size_request(32, 32);
+    let locked_icon = ShimmerImage::new();
+    locked_icon.set_size_request(32, 32);
+
+    let icon_stack = Stack::builder()
+        .transition_type(StackTransitionType::RotateLeftRight)
+        .build();
+    icon_stack.add_named(&normal_icon, Some("normal"));
+    icon_stack.add_named(&locked_icon, Some("locked"));
+
+    let icon_box = Box::builder()
+        .orientation(Orientation::Vertical)
+        .halign(Align::Start)
+        .margin_end(8)
+        .build();
+    icon_box.append(&icon_stack);
+
+    let spacer = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .hexpand(true)
+        .build();
+    let name_label = Label::builder()
+        .ellipsize(EllipsizeMode::End)
+        .halign(Align::Start)
+        .build();
+    let description_label = Label::builder()
+        .ellipsize(EllipsizeMode::End)
+        .halign(Align::Start)
+        .build();
+    let remaining_time_label = Label::builder().build();
+    let label_box = Box::builder().orientation(Orientation::Vertical).build();
+    let global_percentage_progress_bar = CustomProgressBar::new();
+    global_percentage_progress_bar.set_height_request(2);
+    label_box.append(&name_label);
+    label_box.append(&description_label);
+    let entry_box = Box::builder().orientation(Orientation::Vertical).build();
+    let achievement_box = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .margin_top(8)
+        .margin_bottom(8)
+        .margin_start(8)
+        .margin_end(8)
+        .build();
+    achievement_box.append(&icon_box);
+    achievement_box.append(&label_box);
+    achievement_box.append(&spacer);
+    achievement_box.append(&remaining_time_label);
+    entry_box.append(&achievement_box);
+    entry_box.append(&global_percentage_progress_bar);
+    list_item.set_child(Some(&entry_box));
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("name")
+        .bind(&name_label, "label", Widget::NONE);
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("description")
+        .bind(&description_label, "label", Widget::NONE);
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("icon-normal")
+        .bind(&normal_icon, "url", Widget::NONE);
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("icon-locked")
+        .bind(&locked_icon, "url", Widget::NONE);
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("global-achieved-percent")
+        .bind(&global_percentage_progress_bar, "value", Widget::NONE);
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("global-achieved-percent-ok")
+        .bind(&global_percentage_progress_bar, "visible", Widget::NONE);
+
+    list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("time-until-unlock")
+        .bind(&remaining_time_label, "label", Widget::NONE);
+
+    // Custom expressions
+    let is_achieved_expr = list_item
+        .property_expression("item")
+        .chain_property::<GAchievementObject>("is-achieved");
+
+    let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+        let is_achieved = values
+            .get(1)
+            .and_then(|val| val.get::<bool>().ok())
+            .unwrap_or(false);
+        let child_name = if is_achieved { "normal" } else { "locked" };
+        Some(child_name.to_value())
+    });
+
+    let visible_child_expr =
+        ClosureExpression::new::<String>(&[is_achieved_expr], achieved_visible_icon_closure);
+
+    visible_child_expr.bind(&icon_stack, "visible-child-name", Widget::NONE);
 }
