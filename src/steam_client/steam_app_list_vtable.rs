@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![allow(dead_code)]
-
 use crate::steam_client::steamworks_types::AppId_t;
 use std::os::raw::{c_char, c_int};
 
