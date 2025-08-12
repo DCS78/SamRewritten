@@ -61,22 +61,22 @@ pub fn create_main_ui(
         app_stack,
         app_shimmer_image,
         app_label,
-        app_achievements_button,
-        app_stats_button,
+    _app_achievements_button,
+    _app_stats_button,
         app_achievement_count_value,
         app_stats_count_value,
         app_type_value,
         app_developer_value,
         app_metacritic_value,
         app_metacritic_box,
-        app_sidebar,
+    _app_sidebar,
         app_achievements_model,
         app_achievement_string_filter,
         app_stat_model,
         app_stat_string_filter,
         app_pane,
         achievements_manual_adjustment,
-        achievements_manual_spinbox,
+    _achievements_manual_spinbox,
         achievements_manual_start,
         cancel_timed_unlock,
         app_achievements_stack,
@@ -318,7 +318,7 @@ pub fn create_main_ui(
 
         let list_item = match list_item.downcast_ref::<ListItem>() {
             Some(li) => li,
-            none => {
+            _none => {
                 log::error!("Needs to be a ListItem");
                 return;
             }
@@ -373,7 +373,7 @@ pub fn create_main_ui(
                 .item()
                 .and_then(|item| item.downcast::<GSteamAppObject>().ok()) {
                 Some(obj) => obj,
-                none => {
+                _none => {
                     log::error!("Item should be a GSteamAppObject");
                     return;
                 }
@@ -391,7 +391,7 @@ pub fn create_main_ui(
                 .and_then(|button_box| button_box.first_child())
                 .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
                 Some(btn) => btn,
-                none => {
+                _none => {
                     log::error!("Could not find Manage button widget");
                     return;
                 }
@@ -402,7 +402,7 @@ pub fn create_main_ui(
                 .and_then(|button_box| button_box.last_child())
                 .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
                 Some(btn) => btn,
-                none => {
+                _none => {
                     log::error!("Could not find Manage new window button widget");
                     return;
                 }
@@ -412,7 +412,7 @@ pub fn create_main_ui(
                 .and_then(|child| child.prev_sibling())
                 .and_then(|launch_button| launch_button.downcast::<Button>().ok()) {
                 Some(btn) => btn,
-                none => {
+                _none => {
                     log::error!("Could not find Launch button widget");
                     return;
                 }
@@ -510,7 +510,7 @@ pub fn create_main_ui(
     list_factory.connect_unbind(move |_, list_item| {
         let list_item = match list_item.downcast_ref::<ListItem>() {
             Some(li) => li,
-            none => {
+            _none => {
                 log::error!("Needs to be a ListItem");
                 return;
             }
@@ -527,7 +527,7 @@ pub fn create_main_ui(
             .and_then(|button_box| button_box.first_child())
             .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
             Some(btn) => btn,
-            none => {
+            _none => {
                 log::error!("Could not find Manage button widget");
                 return;
             }
@@ -538,7 +538,7 @@ pub fn create_main_ui(
             .and_then(|button_box| button_box.last_child())
             .and_then(|manage_button| manage_button.downcast::<Button>().ok()) {
             Some(btn) => btn,
-            none => {
+            _none => {
                 log::error!("Could not find Manage new window button widget");
                 return;
             }
@@ -548,7 +548,7 @@ pub fn create_main_ui(
             .and_then(|child| child.prev_sibling())
             .and_then(|launch_button| launch_button.downcast::<Button>().ok()) {
             Some(btn) => btn,
-            none => {
+            _none => {
                 log::error!("Could not find Launch button widget");
                 return;
             }
@@ -814,7 +814,7 @@ pub fn create_main_ui(
 
             let app_id_copy = match app_id.get() {
                 Some(id) => id,
-                none => {
+                _none => {
                     log::error!("No App ID for refresh_achievements_list");
                     return;
                 }
@@ -903,7 +903,7 @@ pub fn create_main_ui(
 
             let app_id_copy = match app_id.get() {
                 Some(id) => id,
-                none => {
+                _none => {
                     log::error!("No App ID for clear_all_stats_and_achievements");
                     return;
                 }

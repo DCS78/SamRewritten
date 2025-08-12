@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![allow(non_camel_case_types, non_snake_case)]
+#![allow(non_camel_case_types, non_snake_case, dead_code)]
 
 use crate::steam_client::steam_client_vtable::ISteamClient;
 use std::os::raw::{c_char, c_int, c_uint};
@@ -36,8 +36,6 @@ pub type SteamLeaderboardEntries_t = u64;
 pub type UGCHandle_t = u64;
 
 // Define SteamIPAddress_t (simplified - actual implementation may vary)
-
-#[allow(dead_code)]
 #[repr(C)]
 pub struct SteamIPAddress_t {
     // Implementation depends on actual definition

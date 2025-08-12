@@ -55,19 +55,19 @@ pub fn load_steamclient_library() -> Result<Library, Box<dyn std::error::Error>>
 /// Creates a new ISteamClient interface and retrieves callback function pointers.
 pub fn new_steam_client_interface(
     steamclient_so: &Library,
-) -> Result<
+    ) -> Result<
     (
         *mut ISteamClient,
-        Symbol<SteamGetCallbackFn>,
-        Symbol<SteamFreeLastCallbackFn>,
+        Symbol<'_, SteamGetCallbackFn>,
+        Symbol<'_, SteamFreeLastCallbackFn>,
     ),
     Box<dyn std::error::Error>,
 > {
     unsafe {
         let create_interface: Symbol<CreateInterfaceFn> = steamclient_so.get(b"CreateInterface")?;
-        let steam_get_callback: Symbol<SteamGetCallbackFn> =
+        let steam_get_callback: Symbol<'_, SteamGetCallbackFn> =
             steamclient_so.get(b"Steam_BGetCallback")?;
-        let steam_free_last_callback: Symbol<SteamFreeLastCallbackFn> =
+        let steam_free_last_callback: Symbol<'_, SteamFreeLastCallbackFn> =
             steamclient_so.get(b"Steam_FreeLastCallback")?;
 
         let mut return_code = 1;

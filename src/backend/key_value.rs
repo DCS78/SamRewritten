@@ -142,7 +142,7 @@ impl KeyValue {
     pub fn get(&self, key: &str) -> &KeyValue {
         match self.children.get(key) {
             Some(val) => val,
-            none => {
+            _none => {
                 // Optionally log here if desired
                 Self::invalid()
             }

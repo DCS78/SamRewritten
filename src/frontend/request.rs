@@ -98,7 +98,8 @@ pub struct StopApp {
 
 /// Request to stop all running apps.
 #[derive(Debug, Clone)]
-pub struct StopApps;
+ #[allow(dead_code)]
+ pub struct StopApps;
 
 /// Request to get achievements for an app.
 #[derive(Debug, Clone)]

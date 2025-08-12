@@ -149,7 +149,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                 glib::RustClosure::new(|values: &[glib::Value]| {
                     let is_integer = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
                         Some(val) => val,
-                        none => {
+                        _none => {
                             log::warn!("Failed to get is_integer as bool in adjustment_step_increment_closure");
                             false
                         }
@@ -161,14 +161,14 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let adjustment_lower_closure = glib::RustClosure::new(|values: &[glib::Value]| {
                 let original_value = match values.get(1).and_then(|val| val.get::<f64>().ok()) {
                     Some(val) => val,
-                    none => {
+                    _none => {
                         log::warn!("Failed to get original_value as f64 in adjustment_lower_closure");
                         0f64
                     }
                 };
                 let is_increment_only = match values.get(2).and_then(|val| val.get::<bool>().ok()) {
                     Some(val) => val,
-                    none => {
+                    _none => {
                         log::warn!("Failed to get is_increment_only as bool in adjustment_lower_closure");
                         false
                     }
@@ -184,7 +184,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let spin_button_digits_closure = glib::RustClosure::new(|values: &[glib::Value]| {
                 let is_integer = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
                     Some(val) => val,
-                    none => {
+                    _none => {
                         log::warn!("Failed to get is_integer as bool in spin_button_digits_closure");
                         false
                     }
@@ -196,7 +196,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
                 let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
                     Some(val) => val,
-                    none => {
+                    _none => {
                         log::warn!("Failed to get permission as i32 in permission_sensitive_closure");
                         0
                     }
@@ -208,7 +208,7 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
                 let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
                     Some(val) => val,
-                    none => {
+                    _none => {
                         log::warn!("Failed to get permission as i32 in permission_protected_closure");
                         0
                     }

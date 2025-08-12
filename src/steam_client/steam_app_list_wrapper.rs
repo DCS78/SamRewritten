@@ -21,14 +21,17 @@ use std::os::raw::{c_char, c_int};
 use std::sync::Arc;
 
 /// Safe Rust wrapper for the ISteamAppList interface.
+#[allow(dead_code)]
 pub struct SteamAppList {
     inner: Arc<SteamAppListInner>,
 }
 
+#[allow(dead_code)]
 struct SteamAppListInner {
     ptr: *mut ISteamAppList,
 }
 
+#[allow(dead_code)]
 impl SteamAppList {
     /// Constructs a new `SteamAppList` from a raw pointer.
     /// # Safety

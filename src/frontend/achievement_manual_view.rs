@@ -139,7 +139,7 @@ fn create_header(
                 let percent_b = b.global_achieved_percent();
                 match percent_b.partial_cmp(&percent_a) {
                     Some(ordering) => ordering,
-                    none => {
+                    _none => {
                         log::warn!("partial_cmp returned None in achievements_to_unlock.sort_by");
                         if percent_a.is_nan() && percent_b.is_nan() {
                             Ordering::Equal
@@ -435,7 +435,7 @@ pub fn create_achievements_manual_view(
         let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
             let is_achieved = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
                 Some(val) => val,
-                none => {
+                _none => {
                     log::warn!("Failed to get is_achieved as bool in achieved_visible_icon_closure");
                     false
                 }
@@ -447,7 +447,7 @@ pub fn create_achievements_manual_view(
         let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
             let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
                 Some(val) => val,
-                none => {
+                _none => {
                     log::warn!("Failed to get permission as i32 in permission_sensitive_closure");
                     0
                 }
@@ -458,7 +458,7 @@ pub fn create_achievements_manual_view(
         let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
             let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
                 Some(val) => val,
-                none => {
+                _none => {
                     log::warn!("Failed to get permission as i32 in permission_protected_closure");
                     0
                 }

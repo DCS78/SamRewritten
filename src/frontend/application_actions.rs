@@ -66,7 +66,7 @@ pub fn set_app_action_enabled(application: &MainApplication, action_name: &str, 
                 dev_println!("[CLIENT] Action '{action_name}' is not a SimpleAction");
             }
         }
-        none => {
+    _none => {
             dev_println!("[CLIENT] Action not found: {action_name}");
         }
     }

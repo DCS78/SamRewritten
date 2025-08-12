@@ -45,6 +45,7 @@ impl SteamUtils {
     }
 
     /// Returns the App ID for the current process.
+    #[allow(dead_code)]
     pub fn get_app_id(&self) -> Result<AppId_t, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)

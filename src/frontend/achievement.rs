@@ -27,7 +27,7 @@ impl GAchievementObject {
     pub fn new(info: AchievementInfo) -> Self {
         let global_achieved_percent = match info.global_achieved_percent {
             Some(val) => val,
-            none => {
+            _none => {
                 log::warn!("global_achieved_percent is None, using 0.0 as default");
                 0.0
             }

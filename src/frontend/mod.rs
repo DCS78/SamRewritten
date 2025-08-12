@@ -63,7 +63,7 @@ fn shutdown() {
                         log::error!("[CLIENT] Failed to wait on orchestrator to shutdown: {e}");
                     }
                 }
-                none => {
+                _none => {
                     log::error!("[CLIENT] No orchestrator process to shutdown");
                 }
             }
@@ -74,9 +74,9 @@ fn shutdown() {
     }
 }
 
-#[cfg(not(feature = "adwaita"))]
+#[cfg(not(feature = "adw"))]
 pub type MainApplication = gtk::Application;
-#[cfg(feature = "adwaita")]
+#[cfg(feature = "adw")]
 pub type MainApplication = adw::Application;
 
 /// Entry point for the main UI, sets up the application and event loop.
@@ -98,7 +98,7 @@ pub fn main_ui(orchestrator: BidirChild) -> ExitCode {
         .build();
 
     // Set Adwaita color scheme to match OS theme
-    #[cfg(feature = "adwaita")]
+    #[cfg(feature = "adw")]
     {
         use adw::StyleManager;
         #[cfg(target_os = "windows")]

@@ -15,7 +15,6 @@
 
 use gtk::glib;
 
-/// CustomProgressBar: displays a plain color on a given percentage of width (0-100)
 glib::wrapper! {
     pub struct CustomProgressBar(ObjectSubclass<imp::CustomProgressBar>)
         @extends gtk::Widget,

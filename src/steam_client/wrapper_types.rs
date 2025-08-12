@@ -16,6 +16,7 @@
 //! Contains error types and callback IDs for the Steam client wrappers.
 /// Error type for Steam client wrapper operations.
 #[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum SteamClientError {
     /// The vtable pointer was null.
     NullVtable,
@@ -55,6 +56,7 @@ impl std::error::Error for SteamClientError {}
 
 /// Enum of Steam callback IDs for wrapper event handling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SteamCallbackId {
     /// Callback for user stats received.
     UserStatsReceived = 1101,

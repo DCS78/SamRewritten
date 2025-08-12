@@ -82,7 +82,7 @@ pub fn create_achievements_view(
         let percent2 = achievement2.global_achieved_percent();
         match percent2.partial_cmp(&percent1) {
             Some(ordering) => ordering.into(),
-            none => {
+            _none => {
                 log::warn!("partial_cmp returned None in global_achieved_percent_sorter");
                 Ordering::Equal.into()
             }

@@ -43,4 +43,5 @@ pub struct ISteamAppList {
 }
 
 /// The interface version string for ISteamAppList.
-pub const STEAMAPPLIST_INTERFACE_VERSION: &str = "STEAMAPPLIST_INTERFACE_VERSION001\0";
+ #[allow(dead_code)]
+ pub const STEAMAPPLIST_INTERFACE_VERSION: &str = "STEAMAPPLIST_INTERFACE_VERSION001\0";

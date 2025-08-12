@@ -101,7 +101,7 @@ pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
 
         let cs = match connected_steam.as_mut() {
             Some(cs) => cs,
-            none => {
+            _none => {
                 eprintln!("[ORCHESTRATOR] connected_steam is None");
                 continue;
             }
@@ -227,7 +227,7 @@ fn process_command(
             let mut bidir_opt = children_processes.remove(&app_id);
             let bidir = match bidir_opt.as_mut() {
                 Some(b) => b,
-                none => {
+                _none => {
                     eprintln!("[ORCHESTRATOR] No child process found for app_id {app_id}");
                     return true;
                 }

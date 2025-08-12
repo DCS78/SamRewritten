@@ -15,7 +15,6 @@
 
 use crate::frontend::MainApplication;
 use crate::frontend::application_actions::set_app_action_enabled;
-use gtk::prelude::Cast;
 use gtk::{
     AboutDialog, ApplicationWindow, License, MenuButton, PopoverMenu, PositionType,
     gdk::Paintable,
@@ -52,26 +51,18 @@ pub fn load_logo() -> Paintable {
         Texture::for_pixbuf(&logo_pixbuf).into()
     } else {
         eprintln!("[CLIENT] Failed to load logo. Using a gray square.");
-        let pixbuf = match Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1) {
-            Some(p) => {
-                let mut p = p;
-                p.fill(0x808080FF);
-                p
-            },
-            none => {
-                eprintln!("[CLIENT] Failed to create minimal pixbuf fallback. Returning truly empty texture.");
-                // Return a 1x1 transparent pixbuf or a default Paintable if all else fails
-                return gtk::gdk::Texture::for_pixbuf(&match Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1) {
-                    Some(p) => p,
-                    none => {
-                        eprintln!("[CLIENT] Pixbuf::new failed again. Returning default Paintable.");
-                        // Return a default Paintable (empty texture)
-                        return gtk::gdk::Texture::for_pixbuf(&Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1).unwrap_or_else(|| unsafe { std::mem::zeroed() })).into();
-                    }
-                }).into();
-            }
-        };
-        Texture::for_pixbuf(&pixbuf).into()
+        // Always try to create a 1x1 gray pixbuf as fallback
+        if let Some(p) = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1) {
+            p.fill(0x808080FF);
+            Texture::for_pixbuf(&p).into()
+        } else {
+            eprintln!("[CLIENT] Failed to create minimal pixbuf fallback. Returning default Paintable.");
+            // As a last resort, return an empty Texture (1x1 transparent)
+            let fallback = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1)
+                .map(|p| { p.fill(0x00000000); p })
+                .unwrap();
+            Texture::for_pixbuf(&fallback).into()
+        }
     }
 }
 

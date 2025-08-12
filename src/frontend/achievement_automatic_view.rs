@@ -18,7 +18,7 @@ use crate::frontend::achievement::GAchievementObject;
 use crate::frontend::custom_progress_bar_widget::CustomProgressBar;
 use crate::frontend::shimmer_image::ShimmerImage;
 use gtk::ClosureExpression;
-use gtk::glib::{self, clone};
+use gtk::glib;
 use gtk::pango::EllipsizeMode;
 use gtk::prelude::*;
 use gtk::{
@@ -195,7 +195,7 @@ fn setup_achievement_list_item(list_item: &gtk::ListItem) {
     let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
         let is_achieved = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
             Some(val) => val,
-            none => {
+            _none => {
                 log::warn!("Failed to get is_achieved as bool in achieved_visible_icon_closure");
                 false
             }
