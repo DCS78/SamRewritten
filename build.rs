@@ -15,14 +15,10 @@
 
 //! Handles platform-specific build steps, such as embedding Windows resources.
 fn main() {
-    // On Windows, embed the application icon into the executable.
     #[cfg(windows)]
     {
         let mut res = winres::WindowsResource::new();
         res.set_icon("assets/icon.ico");
-        if let Err(e) = res.compile() {
-            eprintln!("Failed to compile Windows resources: {e}");
-            std::process::exit(1);
-        }
+        res.compile().expect("Failed to compile Windows resources");
     }
 }
