@@ -31,6 +31,26 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
+enum AppStackPage {
+    Achievements,
+    Stats,
+    Failed,
+    Empty,
+    Loading,
+}
+
+impl AppStackPage {
+    fn as_str(&self) -> &'static str {
+        match self {
+            AppStackPage::Achievements => "achievements",
+            AppStackPage::Stats => "stats",
+            AppStackPage::Failed => "failed",
+            AppStackPage::Empty => "empty",
+            AppStackPage::Loading => "loading",
+        }
+    }
+}
+
 /// Create the main app view, including sidebar, achievements, and stats.
 pub fn create_app_view(
     app_id: Rc<Cell<Option<u32>>>,
@@ -70,71 +90,27 @@ pub fn create_app_view(
         .label("Achievements:")
         .halign(Align::Start)
         .build();
-    let app_achievement_count_spacer = Box::builder().hexpand(true).build();
     let app_achievement_count_value = Label::builder().halign(Align::End).build();
-    let app_achievement_count_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(10)
-        .build();
-    app_achievement_count_box.append(&app_achievement_count_label);
-    app_achievement_count_box.append(&app_achievement_count_spacer);
-    app_achievement_count_box.append(&app_achievement_count_value);
+    let app_achievement_count_box = create_labeled_value_box(
+        "Achievements:",
+        &app_achievement_count_value,
+        10,
+    );
 
-    let app_stats_count_label = Label::builder()
-        .label("Stats:")
-        .halign(Align::Start)
-        .build();
-    let app_stats_count_spacer = Box::builder().hexpand(true).build();
     let app_stats_count_value = Label::builder().halign(Align::End).build();
-    let app_stats_count_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(10)
-        .build();
-    app_stats_count_box.append(&app_stats_count_label);
-    app_stats_count_box.append(&app_stats_count_spacer);
-    app_stats_count_box.append(&app_stats_count_value);
+    let app_stats_count_box = create_labeled_value_box("Stats:", &app_stats_count_value, 10);
 
-    let app_type_label = Label::builder().label("Type:").halign(Align::Start).build();
-    let app_type_spacer = Box::builder().hexpand(true).build();
     let app_type_value = Label::builder().halign(Align::End).build();
-    let app_type_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(10)
-        .build();
-    app_type_box.append(&app_type_label);
-    app_type_box.append(&app_type_spacer);
-    app_type_box.append(&app_type_value);
+    let app_type_box = create_labeled_value_box("Type:", &app_type_value, 10);
 
-    let app_developer_label = Label::builder()
-        .label("Developer:")
-        .halign(Align::Start)
-        .build();
-    let app_developer_spacer = Box::builder().hexpand(true).build();
     let app_developer_value = Label::builder()
         .halign(Align::End)
         .ellipsize(EllipsizeMode::End)
         .build();
-    let app_developer_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(20)
-        .build();
-    app_developer_box.append(&app_developer_label);
-    app_developer_box.append(&app_developer_spacer);
-    app_developer_box.append(&app_developer_value);
+    let app_developer_box = create_labeled_value_box("Developer:", &app_developer_value, 20);
 
-    let app_metacritic_label = Label::builder()
-        .label("Metacritic:")
-        .halign(Align::Start)
-        .build();
-    let app_metacritic_spacer = Box::builder().hexpand(true).build();
     let app_metacritic_value = Label::builder().halign(Align::End).build();
-    let app_metacritic_box = Box::builder()
-        .orientation(Orientation::Horizontal)
-        .margin_top(10)
-        .build();
-    app_metacritic_box.append(&app_metacritic_label);
-    app_metacritic_box.append(&app_metacritic_spacer);
-    app_metacritic_box.append(&app_metacritic_value);
+    let app_metacritic_box = create_labeled_value_box("Metacritic:", &app_metacritic_value, 10);
 
     let app_loading_failed_label = Label::builder()
         .label("Failed to load app.")
@@ -218,11 +194,11 @@ pub fn create_app_view(
     let app_stack = Stack::builder()
         .transition_type(StackTransitionType::SlideLeftRight)
         .build();
-    app_stack.add_named(&app_achievements_stack, Some("achievements"));
-    app_stack.add_named(&app_stat_scrolled_window, Some("stats"));
-    app_stack.add_named(&app_loading_failed_label, Some("failed"));
-    app_stack.add_named(&app_no_entries_value, Some("empty"));
-    app_stack.add_named(&app_spinner_box, Some("loading"));
+    app_stack.add_named(&app_achievements_stack, Some(AppStackPage::Achievements.as_str()));
+    app_stack.add_named(&app_stat_scrolled_window, Some(AppStackPage::Stats.as_str()));
+    app_stack.add_named(&app_loading_failed_label, Some(AppStackPage::Failed.as_str()));
+    app_stack.add_named(&app_no_entries_value, Some(AppStackPage::Empty.as_str()));
+    app_stack.add_named(&app_spinner_box, Some(AppStackPage::Loading.as_str()));
 
     app_stack.connect_visible_child_name_notify(clone!(
         #[weak]
@@ -231,11 +207,11 @@ pub fn create_app_view(
         app_stats_button,
         move |stack| {
             match stack.visible_child_name().as_deref() {
-                Some("loading") | Some("failed") => {
+                Some(x) if x == AppStackPage::Loading.as_str() || x == AppStackPage::Failed.as_str() => {
                     app_achievements_button.set_sensitive(false);
                     app_stats_button.set_sensitive(false);
                 }
-                Some("achievements") => {
+                Some(x) if x == AppStackPage::Achievements.as_str() => {
                     app_achievements_button.set_active(true);
                     app_stats_button.set_active(false);
                     app_achievements_button.set_sensitive(true);
@@ -258,9 +234,9 @@ pub fn create_app_view(
         app_achievements_model,
         move |_| {
             if app_achievements_model.n_items() == 0 {
-                app_stack.set_visible_child_name("empty");
+                app_stack.set_visible_child_name(AppStackPage::Empty.as_str());
             } else {
-                app_stack.set_visible_child_name("achievements");
+                app_stack.set_visible_child_name(AppStackPage::Achievements.as_str());
             }
         }
     ));
@@ -272,9 +248,9 @@ pub fn create_app_view(
         app_stat_model,
         move |_| {
             if app_stat_model.n_items() == 0 {
-                app_stack.set_visible_child_name("empty");
+                app_stack.set_visible_child_name(AppStackPage::Empty.as_str());
             } else {
-                app_stack.set_visible_child_name("stats");
+                app_stack.set_visible_child_name(AppStackPage::Stats.as_str());
             }
         }
     ));
@@ -315,3 +291,16 @@ pub fn create_app_view(
         app_achievements_stack,
     )
 }
+
+fn create_labeled_value_box(label: &str, value: &gtk::Label, margin_top: i32) -> gtk::Box {
+    let label_widget = gtk::Label::builder().label(label).halign(gtk::Align::Start).build();
+    let spacer = gtk::Box::builder().hexpand(true).build();
+    let box_widget = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .margin_top(margin_top)
+        .build();
+    box_widget.append(&label_widget);
+    box_widget.append(&spacer);
+    box_widget.append(value);
+       box_widget
+   }

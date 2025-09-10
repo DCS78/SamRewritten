@@ -176,8 +176,8 @@ pub fn create_main_ui(
     let window = ApplicationWindow::builder()
         .application(application)
         .title("SamRewritten")
-        .default_width(800)
-        .default_height(600)
+        .default_width(1600)
+        .default_height(1200)
         .child(&list_stack)
         .titlebar(&header_bar)
         .build();
