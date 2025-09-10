@@ -1,4 +1,3 @@
-use gtk::glib::translate::FromGlib;
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -14,6 +13,12 @@ use gtk::glib::translate::FromGlib;
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+// --- Stack names for repeated use ---
+const STACK_LOADING: &str = "loading";
+const STACK_LIST: &str = "list";
+const STACK_EMPTY: &str = "empty";
+
+// --- Imports ---
 use crate::{
     backend::app_lister::{AppModel, AppModelType},
     frontend::{
@@ -33,7 +38,6 @@ use crate::{
     },
     utils::{arguments::parse_gui_arguments, ipc_types::SamError},
 };
-use gtk::glib::SignalHandlerId;
 use gtk::{
     Align, ApplicationWindow, Box, Button, FilterListModel, HeaderBar, IconSize, Image, Label,
     ListItem, ListView, NoSelection, Orientation, PolicyType, ScrolledWindow, SearchEntry,
@@ -43,10 +47,12 @@ use gtk::{
     glib::{self, ExitCode, MainContext, clone},
     prelude::*,
 };
+use gtk::glib::SignalHandlerId;
+use glib::translate::FromGlib;
 use log;
-use std::os::raw::c_ulong;
-use std::process::Command;
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, os::raw::c_ulong, process::Command, rc::Rc};
+
+// --- Main UI Creation Function ---
 pub fn create_main_ui(
     application: &MainApplication,
     cmd_line: &ApplicationCommandLine,
@@ -61,22 +67,22 @@ pub fn create_main_ui(
         app_stack,
         app_shimmer_image,
         app_label,
-    _app_achievements_button,
-    _app_stats_button,
+        _app_achievements_button,
+        _app_stats_button,
         app_achievement_count_value,
         app_stats_count_value,
         app_type_value,
         app_developer_value,
         app_metacritic_value,
         app_metacritic_box,
-    _app_sidebar,
+        _app_sidebar,
         app_achievements_model,
         app_achievement_string_filter,
         app_stat_model,
         app_stat_string_filter,
         app_pane,
         achievements_manual_adjustment,
-    _achievements_manual_spinbox,
+        _achievements_manual_spinbox,
         achievements_manual_start,
         cancel_timed_unlock,
         app_achievements_stack,
@@ -86,6 +92,7 @@ pub fn create_main_ui(
         application,
     );
 
+    // --- UI Components ---
     // Loading box
     let list_spinner = Spinner::builder().margin_end(5).spinning(true).build();
     let list_spinner_label = Label::builder().label("Loading...").build();
@@ -131,18 +138,18 @@ pub fn create_main_ui(
     let list_of_apps_or_no_result = Stack::builder()
         .transition_type(StackTransitionType::Crossfade)
         .build();
-    list_of_apps_or_no_result.add_named(&list_scrolled_window, Some("list"));
-    list_of_apps_or_no_result.add_named(&app_list_no_result_box, Some("empty"));
+    list_of_apps_or_no_result.add_named(&list_scrolled_window, Some(STACK_LIST));
+    list_of_apps_or_no_result.add_named(&app_list_no_result_box, Some(STACK_EMPTY));
 
     // Main application stack component
     let list_stack = Stack::builder()
         .transition_type(StackTransitionType::SlideLeftRight)
         .build();
-    list_stack.add_named(&list_spinner_box, Some("loading"));
-    list_stack.add_named(&list_of_apps_or_no_result, Some("list"));
+    list_stack.add_named(&list_spinner_box, Some(STACK_LOADING));
+    list_stack.add_named(&list_of_apps_or_no_result, Some(STACK_LIST));
     list_stack.add_named(&app_pane, Some("app"));
 
-    // App list models
+    // --- App list models ---
     let list_factory = SignalListItemFactory::new();
     let list_store = ListStore::new::<GSteamAppObject>();
     let list_string_filter = StringFilter::builder()
@@ -160,7 +167,6 @@ pub fn create_main_ui(
         model
     };
     let list_view = ListView::builder()
-        // .single_click_activate(true)
         .orientation(Orientation::Vertical)
         .show_separators(true)
         .model(&list_selection_model)
@@ -178,7 +184,7 @@ pub fn create_main_ui(
 
     let about_dialog = create_about_dialog(&window);
 
-    // Connect list view activation
+    // --- List view activation ---
     list_view.connect_activate(clone!(
         #[strong]
         app_id,
@@ -207,13 +213,8 @@ pub fn create_main_ui(
         #[weak]
         app_shimmer_image,
         move |list_view, position| {
-            let Some(model) = list_view.model() else {
-                return;
-            };
-            let Some(item) = model.item(position).and_downcast::<GSteamAppObject>() else {
-                return;
-            };
-
+            let Some(model) = list_view.model() else { return; };
+            let Some(item) = model.item(position).and_downcast::<GSteamAppObject>() else { return; };
             switch_from_app_list_to_app(
                 &item,
                 application.clone(),
@@ -233,6 +234,7 @@ pub fn create_main_ui(
         }
     ));
 
+    // --- List item setup ---
     list_factory.connect_setup(move |_, list_item| {
         if let Some(list_item) = list_item.downcast_ref::<gtk::ListItem>() {
             setup_list_item(list_item);
@@ -334,6 +336,7 @@ pub fn create_main_ui(
             .bind(&image, "url", Widget::NONE);
     }
 
+    // --- List item binding and unbinding ---
     list_factory.connect_bind(clone!(
         #[strong]
         app_id,
@@ -581,7 +584,8 @@ pub fn create_main_ui(
         }
     });
 
-    // Search entry setup
+    // --- Search entry setup ---
+    // Use Option::as_ref and Option::as_deref for cleaner code in search_entry.connect_search_changed
     search_entry.connect_search_changed(clone!(
         #[weak]
         list_string_filter,
@@ -592,14 +596,35 @@ pub fn create_main_ui(
         #[weak]
         list_store,
         move |entry| {
-            let text = Some(entry.text()).filter(|s| !s.is_empty());
-
-            // This logic is needed to have flashes of "no results found"
-            if launch_app_by_id_visible.take() {
-                if let Some(app_id) = text.as_ref().map(|t| t.parse::<u32>().ok()).flatten() {
+            let text = entry.text();
+            let text_opt = if text.is_empty() { None } else { Some(text) };
+            let current_search = list_string_filter.search().unwrap_or_default();
+            if text_opt.as_deref() != Some(&current_search) {
+                if launch_app_by_id_visible.take() {
+                    if let Some(app_id) = text_opt.as_ref().and_then(|t| t.parse::<u32>().ok()) {
+                        launch_app_by_id_visible.set(true);
+                        list_store.insert(
+                            1,
+                            &GSteamAppObject::new(AppModel {
+                                app_id,
+                                app_name: format!("App {app_id}"),
+                                app_type: AppModelType::App,
+                                developer: "Unknown".to_string(),
+                                image_url: None,
+                                metacritic_score: None,
+                            }),
+                        );
+                    }
+                    app_achievement_string_filter.set_search(text_opt.as_deref());
+                    app_stat_string_filter.set_search(text_opt.as_deref());
+                    list_string_filter.set_search(text_opt.as_deref());
+                    list_store.remove(0);
+                    return;
+                }
+                if let Some(app_id) = text_opt.as_ref().and_then(|t| t.parse::<u32>().ok()) {
                     launch_app_by_id_visible.set(true);
                     list_store.insert(
-                        1,
+                        0,
                         &GSteamAppObject::new(AppModel {
                             app_id,
                             app_name: format!("App {app_id}"),
@@ -610,48 +635,27 @@ pub fn create_main_ui(
                         }),
                     );
                 }
-
-                app_achievement_string_filter.set_search(text.as_deref());
-                app_stat_string_filter.set_search(text.as_deref());
-                list_string_filter.set_search(text.as_deref());
-                list_store.remove(0);
-                return;
+                app_achievement_string_filter.set_search(text_opt.as_deref());
+                app_stat_string_filter.set_search(text_opt.as_deref());
+                list_string_filter.set_search(text_opt.as_deref());
             }
-
-            if let Some(app_id) = text.clone().map(|t| t.parse::<u32>().ok()).flatten() {
-                launch_app_by_id_visible.set(true);
-                list_store.insert(
-                    0,
-                    &GSteamAppObject::new(AppModel {
-                        app_id,
-                        app_name: format!("App {app_id}"),
-                        app_type: AppModelType::App,
-                        developer: "Unknown".to_string(),
-                        image_url: None,
-                        metacritic_score: None,
-                    }),
-                );
-            }
-
-            app_achievement_string_filter.set_search(text.as_deref());
-            app_stat_string_filter.set_search(text.as_deref());
-            list_string_filter.set_search(text.as_deref());
         }
     ));
 
+    // --- Filter model change handler ---
     list_filter_model.connect_items_changed(clone!(
         #[weak]
         list_of_apps_or_no_result,
         move |model, _, _, _| {
             if model.n_items() == 0 {
-                list_of_apps_or_no_result.set_visible_child_name("empty");
+                list_of_apps_or_no_result.set_visible_child_name(STACK_EMPTY);
             } else {
-                list_of_apps_or_no_result.set_visible_child_name("list");
+                list_of_apps_or_no_result.set_visible_child_name(STACK_LIST);
             }
         }
     ));
 
-    // Back button handler
+    // --- Back button handler ---
     back_button.connect_clicked(clone!(
         #[weak]
         list_stack,
@@ -669,32 +673,27 @@ pub fn create_main_ui(
         cancel_timed_unlock,
         move |_| {
             cancel_timed_unlock.store(true, std::sync::atomic::Ordering::Relaxed);
-            list_stack.set_visible_child_name("list");
+            list_stack.set_visible_child_name(STACK_LIST);
             set_context_popover_to_app_list_context(&menu_model, &application);
             if let Some(app_id) = app_id.take() {
                 spawn_blocking(move || {
                     let _ = StopApp { app_id }.request();
                 });
             }
-
-            // Clear achievements and stats for performance, but wait a bit before doing so
-            // to avoid flashes of the data disappearing during the animation
             let handle = spawn_blocking(move || {
                 std::thread::sleep(std::time::Duration::from_millis(500));
             });
-
             MainContext::default().spawn_local(async move {
                 if Some(()) != handle.await.ok() {
                     eprintln!("[CLIENT] Threading task failed");
                 }
-
                 app_achievements_model.remove_all();
                 app_stat_model.remove_all();
             });
         }
     ));
 
-    // App actions
+    // --- App actions ---
     let action_refresh_app_list = SimpleAction::new("refresh_app_list", None);
     action_refresh_app_list.connect_activate(clone!(
         #[strong]
@@ -712,7 +711,7 @@ pub fn create_main_ui(
         #[weak]
         search_entry,
         move |_, _| {
-            list_stack.set_visible_child_name("loading");
+            list_stack.set_visible_child_name(STACK_LOADING);
             search_entry.set_sensitive(false);
             let apps = spawn_blocking(move || GetOwnedAppList.request());
             MainContext::default().spawn_local(clone!(
@@ -734,12 +733,11 @@ pub fn create_main_ui(
                     match apps.await {
                         Ok(Ok(app_vec)) => {
                             search_entry.set_sensitive(true);
-
                             if app_vec.is_empty() {
                                 app_list_no_result_label.set_text("No apps found on your account. Search for App Id to get started.");
-                                list_of_apps_or_no_result.set_visible_child_name("empty");
+                                list_of_apps_or_no_result.set_visible_child_name(STACK_EMPTY);
                                 list_scrolled_window.set_child(Some(&list_view));
-                                list_stack.set_visible_child_name("list");
+                                list_stack.set_visible_child_name(STACK_LIST);
                             } else {
                                 list_store.remove_all();
                                 let mut models: Vec<GSteamAppObject> =
@@ -751,22 +749,22 @@ pub fn create_main_ui(
                                 });
                                 list_store.extend_from_slice(&models);
                                 list_scrolled_window.set_child(Some(&list_view));
-                                list_stack.set_visible_child_name("list");
+                                list_stack.set_visible_child_name(STACK_LIST);
                                 app_list_no_result_label.set_text("No results. Check for spelling mistakes or try typing an App Id.");
                             }
                         },
                         Ok(Err(sam_error)) if sam_error == SamError::AppListRetrievalFailed => {
                             search_entry.set_sensitive(true);
                             app_list_no_result_label.set_text("Failed to load library. Check your internet connection. Search for App Id to get started.");
-                            list_of_apps_or_no_result.set_visible_child_name("empty");
+                            list_of_apps_or_no_result.set_visible_child_name(STACK_EMPTY);
                             list_scrolled_window.set_child(Some(&list_view));
-                            list_stack.set_visible_child_name("list");
+                            list_stack.set_visible_child_name(STACK_LIST);
                         },
                         Ok(Err(sam_error)) => {
                             eprintln!("[CLIENT] Unknown error: {}", sam_error);
                             let label = Label::new(Some("SamRewritten could not connect to Steam. Is it running?"));
                             list_scrolled_window.set_child(Some(&label));
-                            list_stack.set_visible_child_name("list");
+                            list_stack.set_visible_child_name(STACK_LIST);
                         }
                         Err(join_error) => {
                             eprintln!("Spawn blocking error: {:?}", join_error);
@@ -805,7 +803,7 @@ pub fn create_main_ui(
         #[strong]
         cancel_timed_unlock,
         move |_, _| {
-            app_stack.set_visible_child_name("loading");
+            app_stack.set_visible_child_name(STACK_LOADING);
             set_app_action_enabled(&application, "refresh_achievements_list", false);
             app_achievements_model.remove_all();
             app_stat_model.remove_all();
@@ -896,7 +894,7 @@ pub fn create_main_ui(
         #[weak]
         app_stack,
         move |_, _| {
-            app_stack.set_visible_child_name("loading");
+            app_stack.set_visible_child_name(STACK_LOADING);
             set_app_action_enabled(&application, "clear_all_stats_and_achievements", false);
             app_achievements_model.remove_all();
             app_stat_model.remove_all();
@@ -927,6 +925,7 @@ pub fn create_main_ui(
         }
     ));
 
+    // --- Stack visible child notify handler ---
     list_stack.connect_visible_child_notify(clone!(
         #[weak]
         back_button,
@@ -939,7 +938,7 @@ pub fn create_main_ui(
         #[weak]
         action_refresh_app_list,
         move |stack| {
-            if stack.visible_child_name().as_deref() == Some("loading") {
+            if stack.visible_child_name().as_deref() == Some(STACK_LOADING) {
                 back_button.set_sensitive(false);
                 action_refresh_app_list.set_enabled(false);
             } else if stack.visible_child_name().as_deref() == Some("app") {
@@ -957,7 +956,6 @@ pub fn create_main_ui(
                 if auto_launch_app > 0 {
                     gui_args.auto_open.set(0);
 
-                    // let mut found_iter = None;
                     for ach in &list_store {
                         if let Ok(obj) = ach {
                             let g_app = match obj.downcast::<GSteamAppObject>() {
@@ -968,7 +966,6 @@ pub fn create_main_ui(
                                 }
                             };
                             if g_app.app_id() == auto_launch_app {
-                                // found_iter = Some(g_app);
                                 switch_from_app_list_to_app(
                                     &g_app,
                                     application.clone(),
@@ -994,8 +991,9 @@ pub fn create_main_ui(
         }
     ));
 
-    app_stack.set_visible_child_name("loading");
-    list_stack.set_visible_child_name("loading");
+    // --- Initial state and actions setup ---
+    app_stack.set_visible_child_name(STACK_LOADING);
+    list_stack.set_visible_child_name(STACK_LOADING);
     action_refresh_app_list.activate(None);
     action_refresh_app_list.set_enabled(false);
 

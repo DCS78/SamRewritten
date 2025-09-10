@@ -15,3 +15,4 @@ icon.png
 
 # XML files (if generated or not needed in VCS)
 *.xml
+/.vs
