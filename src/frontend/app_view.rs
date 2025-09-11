@@ -86,7 +86,7 @@ pub fn create_app_view(
     app_spinner_box.append(&app_spinner);
     app_spinner_box.append(&app_spinner_label);
 
-    let app_achievement_count_label = Label::builder()
+    let _app_achievement_count_label = Label::builder()
         .label("Achievements:")
         .halign(Align::Start)
         .build();
