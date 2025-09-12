@@ -113,43 +113,44 @@ fn create_header(
         timed_raw_model,
         move |_| {
             let unlocked_achievements = count_unlocked_achievements(&raw_model) as i32;
-            let total_achievements = raw_model.n_items();
+            let _total_achievements = raw_model.n_items();
             let desired_achievements = spin_button_achievements_count.value_as_int();
             let desired_minutes = spin_button_minutes_count.value_as_int();
             let achievements_to_unlock_count = (desired_achievements - unlocked_achievements) as usize;
-            let mut achievements_to_unlock = vec![];
+            if achievements_to_unlock_count == 0 {
+                dev_println!("[CLIENT] No achievements to unlock");
+                return;
+            }
+            let mut achievements_to_unlock = Vec::with_capacity(achievements_to_unlock_count);
 
             for achievement in &raw_model {
                 if let Ok(obj) = achievement {
-                    match obj.downcast::<GAchievementObject>() {
-                        Ok(g_achievement) => {
-                            if !g_achievement.is_achieved() && g_achievement.permission() & 2 == 0 {
-                                achievements_to_unlock.push(g_achievement);
+                    if let Ok(g_achievement) = obj.downcast::<GAchievementObject>() {
+                        if !g_achievement.is_achieved() && g_achievement.permission() & 2 == 0 {
+                            achievements_to_unlock.push(g_achievement);
+                            if achievements_to_unlock.len() == achievements_to_unlock_count {
+                                break;
                             }
                         }
-                        Err(_) => {
-                            log::error!("Not a GAchievementObject in auto-unlock loop");
-                        }
+                    } else {
+                        log::error!("Not a GAchievementObject in auto-unlock loop");
                     }
                 }
             }
 
-            achievements_to_unlock.sort_by(|a, b| {
+            achievements_to_unlock.sort_unstable_by(|a, b| {
                 let percent_a = a.global_achieved_percent();
                 let percent_b = b.global_achieved_percent();
-                match percent_b.partial_cmp(&percent_a) {
-                    Some(ordering) => ordering,
-                    _none => {
-                        log::warn!("partial_cmp returned None in achievements_to_unlock.sort_by");
-                        if percent_a.is_nan() && percent_b.is_nan() {
-                            Ordering::Equal
-                        } else if percent_a.is_nan() {
-                            Ordering::Greater
-                        } else {
-                            Ordering::Less
-                        }
+                percent_b.partial_cmp(&percent_a).unwrap_or_else(|| {
+                    log::warn!("partial_cmp returned None in achievements_to_unlock.sort_by");
+                    if percent_a.is_nan() && percent_b.is_nan() {
+                        Ordering::Equal
+                    } else if percent_a.is_nan() {
+                        Ordering::Greater
+                    } else {
+                        Ordering::Less
                     }
-                }
+                })
             });
 
             achievements_to_unlock.truncate(achievements_to_unlock_count);
@@ -164,18 +165,15 @@ fn create_header(
             dev_println!("[CLIENT] Evaluation of automatic unlocking: unlocked: {unlocked_achievements}, total: {total_achievements}, desired: {desired_achievements}");
             if desired_minutes == 0 {
                 dev_println!("[CLIENT] Unlock desired achievements immediately");
-                for achievement_to_unlock in achievements_to_unlock {
+                for achievement_to_unlock in &achievements_to_unlock {
                     let res = SetAchievement {
                         app_id: app_id_int,
                         achievement_id: achievement_to_unlock.id(),
                         unlocked: true
                     }.request();
 
-                    match res {
-                        Ok(_) => {}
-                        Err(e) => {
-                            eprintln!("[CLIENT] Failed to set achievement: {:?}", e);
-                        }
+                    if let Err(e) = res {
+                        eprintln!("[CLIENT] Failed to set achievement: {:?}", e);
                     }
                 }
 
@@ -187,67 +185,63 @@ fn create_header(
             timed_raw_model.extend_from_slice(&achievements_to_unlock);
             cancelled_task.store(false, std::sync::atomic::Ordering::Relaxed);
 
-            // Conception: ajouter à GAchievement la propriété time-before-unlock
-            MainContext::default().spawn_local(clone!(
-                #[strong]
-                timed_raw_model,
-                #[strong]
-                cancelled_task,
-                async move {
-                    let mut elapsed = 0usize;
-                    let need_elapsed = (desired_minutes * 60 * 1000) as usize;
-                    let ms_per_achievement = need_elapsed / achievements_to_unlock_count;
-                    let refresh_rate = std::cmp::min(1000, ms_per_achievement);
-                    let refreshes_per_achievement = ms_per_achievement / refresh_rate;
-                    let refresh_rate = std::time::Duration::from_millis(refresh_rate as u64);
-                    let mut next_ach_to_unlock_index = 0usize;
-                    let mut refreshes_without_unlock = 0usize;
+            let achievements_to_unlock = achievements_to_unlock; // move into async block
+            let timed_raw_model = timed_raw_model.clone();
+            let cancelled_task = cancelled_task.clone();
+            let desired_minutes = desired_minutes;
+            MainContext::default().spawn_local(async move {
+                let mut elapsed = 0usize;
+                let need_elapsed = (desired_minutes * 60 * 1000) as usize;
+                let ms_per_achievement = need_elapsed / achievements_to_unlock.len().max(1);
+                let refresh_rate = std::cmp::min(1000, ms_per_achievement);
+                let refreshes_per_achievement = ms_per_achievement / refresh_rate.max(1);
+                let refresh_rate = std::time::Duration::from_millis(refresh_rate as u64);
+                let mut next_ach_to_unlock_index = 0usize;
+                let mut refreshes_without_unlock = 0usize;
 
-                    while next_ach_to_unlock_index < achievements_to_unlock_count {
-                        if cancelled_task.load(std::sync::atomic::Ordering::Relaxed) {
-                            dev_println!("[CLIENT] Timed unlock task cancelled");
-                            timed_raw_model.remove_all();
-                            break;
-                        }
-
-                        let handle = spawn_blocking(move || {
-                            std::thread::sleep(refresh_rate);
-                        });
-
-                        if let Err(e) = handle.await {
-                            log::error!("Couldn't get handle: {:?}", e);
-                        }
-
-                        refreshes_without_unlock += 1;
-                        if refreshes_without_unlock >= refreshes_per_achievement {
-                            let achievement = &achievements_to_unlock[next_ach_to_unlock_index];
-                            dev_println!("[CLIENT] Timed unlock of {}", achievement.name());
-                            achievement.set_is_achieved(true);
-
-                            next_ach_to_unlock_index += 1;
-                            refreshes_without_unlock = 0;
-                        }
-
-                        elapsed += refresh_rate.as_millis() as usize;
-
-                        for i in 0..achievements_to_unlock.len() {
-                            let target_elapsed_ms_for_ach = (i + 1) * ms_per_achievement;
-                            let remaining_ms = target_elapsed_ms_for_ach.saturating_sub(elapsed);
-                            let remaining_seconds = remaining_ms / 1000;
-
-                            if remaining_seconds == 0 {
-                                achievements_to_unlock[i].set_time_until_unlock("OK");
-                            }
-                            else {
-                                let timer_str = format_seconds_to_mm_ss(remaining_seconds);
-                                achievements_to_unlock[i].set_time_until_unlock(timer_str);
-                            }
-                        }
+                while next_ach_to_unlock_index < achievements_to_unlock.len() {
+                    if cancelled_task.load(std::sync::atomic::Ordering::Relaxed) {
+                        dev_println!("[CLIENT] Timed unlock task cancelled");
+                        timed_raw_model.remove_all();
+                        break;
                     }
 
-                    dev_println!("[CLIENT] Timed unlock task finished");
+                    let handle = spawn_blocking(move || {
+                        std::thread::sleep(refresh_rate);
+                    });
+
+                    if let Err(e) = handle.await {
+                        log::error!("Couldn't get handle: {:?}", e);
+                    }
+
+                    refreshes_without_unlock += 1;
+                    if refreshes_without_unlock >= refreshes_per_achievement {
+                        let achievement = &achievements_to_unlock[next_ach_to_unlock_index];
+                        dev_println!("[CLIENT] Timed unlock of {}", achievement.name());
+                        achievement.set_is_achieved(true);
+
+                        next_ach_to_unlock_index += 1;
+                        refreshes_without_unlock = 0;
+                    }
+
+                    elapsed += refresh_rate.as_millis() as usize;
+
+                    for (i, ach) in achievements_to_unlock.iter().enumerate() {
+                        let target_elapsed_ms_for_ach = (i + 1) * ms_per_achievement;
+                        let remaining_ms = target_elapsed_ms_for_ach.saturating_sub(elapsed);
+                        let remaining_seconds = remaining_ms / 1000;
+
+                        if remaining_seconds == 0 {
+                            ach.set_time_until_unlock("OK");
+                        } else {
+                            let timer_str = format_seconds_to_mm_ss(remaining_seconds);
+                            ach.set_time_until_unlock(timer_str);
+                        }
+                    }
                 }
-            ));
+
+                dev_println!("[CLIENT] Timed unlock task finished");
+            });
 
             achievement_views_stack.set_visible_child_name("automatic");
     }));

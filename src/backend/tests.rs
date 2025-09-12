@@ -23,154 +23,76 @@ mod tests {
 
     /// Test fetching achievements for a known app.
     #[test]
-    fn get_achievements_with_callback() {
-        let mut app_manager = match AppManager::new_connected(206690) {
-            Ok(mgr) => mgr,
-            Err(e) => {
-                eprintln!("Failed to create app manager: {e}");
-                return;
-            }
-        };
-        let achievements = match app_manager.get_achievements() {
-            Ok(ach) => ach,
-            Err(e) => {
-                eprintln!("Failed to get achievements: {e}");
-                return;
-            }
-        };
-        println!("{achievements:?}");
+    fn get_achievements_with_callback() -> Result<(), String> {
+        let mut app_manager = AppManager::new_connected(206690)
+            .map_err(|e| format!("Failed to create app manager: {e}"))?;
+        let achievements = app_manager.get_achievements()
+            .map_err(|e| format!("Failed to get achievements: {e}"))?;
+        // You may want to assert something more specific if you know the expected result
+        assert!(!achievements.is_empty(), "Achievements should not be empty");
+        Ok(())
     }
 
     /// Test fetching stats for a known app.
     #[test]
-    fn get_stats_no_message() {
-        let mut app_manager = match AppManager::new_connected(480) {
-            Ok(mgr) => mgr,
-            Err(e) => {
-                eprintln!("Failed to create app manager: {e}");
-                return;
-            }
-        };
-        let stats = match app_manager.get_statistics() {
-            Ok(stats) => stats,
-            Err(e) => {
-                eprintln!("Failed to get stats: {e}");
-                return;
-            }
-        };
-        println!("{stats:?}");
+    fn get_stats_no_message() -> Result<(), String> {
+        let mut app_manager = AppManager::new_connected(480)
+            .map_err(|e| format!("Failed to create app manager: {e}"))?;
+        let stats = app_manager.get_statistics()
+            .map_err(|e| format!("Failed to get stats: {e}"))?;
+        // You may want to assert something more specific if you know the expected result
+        assert!(!stats.is_empty(), "Stats should not be empty");
+        Ok(())
     }
 
     /// Test resetting all stats for a known app.
     #[test]
-    fn reset_stats_no_message() {
-        let app_manager = match AppManager::new_connected(480) {
-            Ok(mgr) => mgr,
-            Err(e) => {
-                eprintln!("Failed to create app manager: {e}");
-                return;
-            }
-        };
-        let success = match app_manager.reset_all_stats(true) {
-            Ok(success) => success,
-            Err(e) => {
-                eprintln!("Failed to reset stats: {e}");
-                return;
-            }
-        };
-        println!("Success: {success:?}");
+    fn reset_stats_no_message() -> Result<(), String> {
+        let app_manager = AppManager::new_connected(480)
+            .map_err(|e| format!("Failed to create app manager: {e}"))?;
+        let success = app_manager.reset_all_stats(true)
+            .map_err(|e| format!("Failed to reset stats: {e}"))?;
+        assert!(success, "Reset stats should return true");
+        Ok(())
     }
 
     /// Test brute-forcing various app data keys for SteamApps001.
     #[test]
-    fn brute_force_app001_keys() {
-        // Find others on your own with the Steam command app_info_print
-        let connected_steam = match ConnectedSteam::new() {
-            Ok(cs) => cs,
-            Err(e) => {
-                eprintln!("Failed to create connected steam: {e}");
-                return;
-            }
-        };
+    fn brute_force_app001_keys() -> Result<(), String> {
+        let connected_steam = ConnectedSteam::new()
+            .map_err(|e| format!("Failed to create connected steam: {e}"))?;
         let try_force = |key: &str| {
             let null_terminated_key = format!("{key}\0");
-            let value = match connected_steam.apps_001.get_app_data(&220, &null_terminated_key) {
-                Ok(val) => val,
-                Err(e) => {
-                    eprintln!("Failed to get app data for key: {key}: {e}");
-                    "Failure".to_string()
-                }
-            };
-            println!("{key}:\t {value}");
+            let value = connected_steam.apps_001.get_app_data(&220, &null_terminated_key);
+            // Not asserting here, just checking that it doesn't panic
+            value.is_ok()
         };
-
-        try_force(&SteamApps001AppDataKeys::Name.as_string());
-        try_force(&SteamApps001AppDataKeys::Logo.as_string());
-        try_force(&SteamApps001AppDataKeys::SmallCapsule("english").as_string());
-        try_force("subscribed");
-
-        try_force("metascore");
-        try_force("metascore/score");
-        try_force("metascorescore");
-        try_force("metascorerating");
-        try_force("metascore/rating");
-        try_force("metascore_rating");
-        try_force("metascore_rating");
-
-        try_force("metacritic");
-        try_force("metacritic/score");
-        try_force("metacritic/url");
-        try_force("metacriticurl/english");
-        try_force("metacritic/url/english");
-        try_force("metacriticscore");
-        try_force("metacritic_score");
-        try_force("metacriticrating");
-        try_force("metacritic/rating");
-        try_force("metacritic_rating");
-        try_force("metacritic_rating");
-
-        try_force("developer");
-        try_force("developer/english");
-        try_force("extended/developer");
-        try_force("state");
-        try_force("homepage");
-        try_force("clienticon");
+        assert!(try_force(&SteamApps001AppDataKeys::Name.as_string()));
+        assert!(try_force(&SteamApps001AppDataKeys::Logo.as_string()));
+        assert!(try_force(&SteamApps001AppDataKeys::SmallCapsule("english").as_string()));
+        assert!(try_force("subscribed"));
+        Ok(())
     }
 
     /// Test loading a binary KeyValue file from disk.
     #[test]
-    fn keyval() {
+    fn keyval() -> Result<(), String> {
         #[cfg(target_os = "linux")]
-        let home = match env::var("HOME") {
-            Ok(val) => val,
-            Err(e) => {
-                eprintln!("Failed to get home directory: {e}");
-                return;
-            }
-        };
+        let home = env::var("HOME").map_err(|e| format!("Failed to get home directory: {e}"))?;
         #[cfg(target_os = "linux")]
         let bin_file = PathBuf::from(
             home + "/snap/steam/common/.local/share/Steam/appcache/stats/UserGameStatsSchema_730.bin",
         );
         #[cfg(target_os = "windows")]
-        let program_files = match env::var("ProgramFiles(x86)") {
-            Ok(val) => val,
-            Err(e) => {
-                eprintln!("Failed to get Program Files directory: {e}");
-                return;
-            }
-        };
+        let program_files = env::var("ProgramFiles(x86)").map_err(|e| format!("Failed to get Program Files directory: {e}"))?;
         #[cfg(target_os = "windows")]
         let bin_file =
             PathBuf::from(program_files + "\\Steam\\appcache\\stats\\UserGameStatsSchema_480.bin");
 
-        let kv = match KeyValue::load_as_binary(bin_file) {
-            Ok(kv) => kv,
-            Err(e) => {
-                eprintln!("Failed to load key value: {e}");
-                return;
-            }
-        };
-        println!("{kv:?}");
+        let kv = KeyValue::load_as_binary(bin_file)
+            .map_err(|e| format!("Failed to load key value: {e}"))?;
+        // You may want to assert something more specific if you know the expected result
+        assert!(!format!("{kv:?}").is_empty(), "KeyValue should not be empty");
+        Ok(())
     }
 }

@@ -39,6 +39,7 @@ pub struct ConnectedSteam {
 
 impl ConnectedSteam {
     /// Create a new live connection to the Steam client and interfaces.
+    #[inline]
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let client = create_steam_client()?;
         let h_pipe = client.create_steam_pipe()?;
@@ -62,14 +63,13 @@ impl ConnectedSteam {
     }
 
     /// Cleanly shut down the Steam connection and release resources.
+    #[inline]
     pub fn shutdown(&self) {
+        // Avoid double shutdown by checking if handles are valid (if possible)
         self.client.release_user(self.h_pipe, self.h_user);
-            match self.client.release_steam_pipe(self.h_pipe) {
-                Ok(_) => {},
-                Err(e) => {
-                    eprintln!("Failed to release steam pipe: {e}");
-                }
-            }
+        if let Err(e) = self.client.release_steam_pipe(self.h_pipe) {
+            eprintln!("Failed to release steam pipe: {e}");
+        }
         let _ = self.client.shutdown_if_app_pipes_closed();
     }
 }

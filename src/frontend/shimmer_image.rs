@@ -127,27 +127,30 @@ mod imp {
             let rounded = RoundedRect::new(rect, size, size, size, size);
             snapshot.push_rounded_clip(&rounded);
 
-            if let Some(url) = self.url.borrow_mut().take() {
+            // Only take the url if it is Some and not already loaded
+            let url_opt = self.url.borrow_mut();
+            if let Some(url) = url_opt.as_ref() {
                 if Some(url.as_str()) != self.loaded.borrow().as_deref() {
                     self.texture.borrow_mut().take();
                     self.loaded.borrow_mut().take();
                     self.receiver.borrow_mut().take();
                     self.load(url.as_str());
-                    self.loaded.borrow_mut().replace(url);
+                    self.loaded.borrow_mut().replace(url.clone());
                 }
             }
 
-            let receiver = self.receiver.borrow_mut().take();
-            if let Some(receiver) = receiver {
+            // Only take the receiver if it is Some
+            let mut receiver_opt = self.receiver.borrow_mut();
+            if let Some(receiver) = receiver_opt.as_mut() {
                 match receiver.try_recv() {
                     Ok(texture) => {
                         self.texture.borrow_mut().replace(texture);
+                        receiver_opt.take();
                     }
-                    Err(TryRecvError::Empty) => {
-                        self.receiver.borrow_mut().replace(receiver);
-                    }
+                    Err(TryRecvError::Empty) => {}
                     Err(TryRecvError::Disconnected) => {
                         self.failed.set(true);
+                        receiver_opt.take();
                     }
                 }
             }

@@ -35,12 +35,23 @@ pub struct BidirChild {
 }
 
 impl BidirChild {
-    /// Spawns a new child process with bidirectional unnamed pipes for IPC (Unix).
+    /// Spawns a new child process with bidirectional unnamed pipes for IPC (platform-specific).
     #[cfg(unix)]
-
     pub fn new(command: &mut Command) -> Result<Self, SamError> {
-        let (parent_to_child_tx, parent_to_child_rx) = pipe().map_err(|_| SamError::UnknownError)?;
-        let (child_to_parent_tx, child_to_parent_rx) = pipe().map_err(|_| SamError::UnknownError)?;
+        // Use a helper to reduce code duplication and improve clarity
+        fn create_pipes() -> Result<((Sender, Recver), (Sender, Recver)), SamError> {
+            let (parent_to_child_tx, parent_to_child_rx) = pipe().map_err(|e| {
+                eprintln!("Pipe creation failed: {e}");
+                SamError::UnknownError
+            })?;
+            let (child_to_parent_tx, child_to_parent_rx) = pipe().map_err(|e| {
+                eprintln!("Pipe creation failed: {e}");
+                SamError::UnknownError
+            })?;
+            Ok(((parent_to_child_tx, parent_to_child_rx), (child_to_parent_tx, child_to_parent_rx)))
+        }
+
+        let ((parent_to_child_tx, parent_to_child_rx), (child_to_parent_tx, child_to_parent_rx)) = create_pipes()?;
 
         let child_to_parent_tx_handle: i32 = child_to_parent_tx.into_raw_fd();
         let parent_to_child_rx_handle: i32 = parent_to_child_rx.into_raw_fd();
@@ -49,8 +60,8 @@ impl BidirChild {
             .arg(format!("--tx={child_to_parent_tx_handle}"))
             .arg(format!("--rx={parent_to_child_rx_handle}"))
             .spawn()
-            .map_err(|_| {
-                eprintln!("Unable to spawn a child process");
+            .map_err(|e| {
+                eprintln!("Unable to spawn a child process: {e}");
                 SamError::UnknownError
             })?;
 
@@ -61,19 +72,29 @@ impl BidirChild {
         })
     }
 
-    /// Spawns a new child process with bidirectional unnamed pipes for IPC (Windows).
     #[cfg(windows)]
     pub fn new(command: &mut Command) -> Result<Self, SamError> {
-        let (parent_to_child_tx, parent_to_child_rx) =
-            interprocess::os::windows::unnamed_pipe::CreationOptions::default()
+        use interprocess::os::windows::unnamed_pipe::CreationOptions;
+        // Helper for pipe creation and error logging
+        fn create_pipes() -> Result<((Sender, Recver), (Sender, Recver)), SamError> {
+            let (parent_to_child_tx, parent_to_child_rx) = CreationOptions::default()
                 .inheritable(true)
                 .build()
-                .map_err(|_| SamError::UnknownError)?;
-        let (child_to_parent_tx, child_to_parent_rx) =
-            interprocess::os::windows::unnamed_pipe::CreationOptions::default()
+                .map_err(|e| {
+                    eprintln!("Pipe creation failed: {e}");
+                    SamError::UnknownError
+                })?;
+            let (child_to_parent_tx, child_to_parent_rx) = CreationOptions::default()
                 .inheritable(true)
                 .build()
-                .map_err(|_| SamError::UnknownError)?;
+                .map_err(|e| {
+                    eprintln!("Pipe creation failed: {e}");
+                    SamError::UnknownError
+                })?;
+            Ok(((parent_to_child_tx, parent_to_child_rx), (child_to_parent_tx, child_to_parent_rx)))
+        }
+
+        let ((parent_to_child_tx, parent_to_child_rx), (child_to_parent_tx, child_to_parent_rx)) = create_pipes()?;
 
         let child_to_parent_tx_handle: OwnedHandle = child_to_parent_tx.into();
         let parent_to_child_rx_handle: OwnedHandle = parent_to_child_rx.into();
@@ -88,8 +109,8 @@ impl BidirChild {
                 parent_to_child_rx_handle.as_raw_handle() as usize
             ))
             .spawn()
-            .map_err(|_| {
-                eprintln!("Unable to spawn a child process");
+            .map_err(|e| {
+                eprintln!("Unable to spawn a child process: {e}");
                 SamError::UnknownError
             })?;
 

@@ -316,8 +316,15 @@ impl<'a> AppManager {
                         }
                     };
 
+                    let icon_normal = &def.icon_normal;
+                    let icon_locked = if def.icon_locked.is_empty() {
+                        icon_normal
+                    } else {
+                        &def.icon_locked
+                    };
+
                     achievement_infos.push(AchievementInfo {
-                        id: def_id.to_string(),
+                        id: def_id.clone(),
                         is_achieved,
                         unlock_time: if is_achieved && unlock_time > 0 {
                             UNIX_EPOCH
@@ -325,15 +332,11 @@ impl<'a> AppManager {
                         } else {
                             None
                         },
-                        icon_normal: def.clone().icon_normal,
-                        icon_locked: if def.icon_locked.is_empty() {
-                            def.clone().icon_normal
-                        } else {
-                            def.clone().icon_locked
-                        },
-                        permission: def.clone().permission,
-                        name: def.clone().name,
-                        description: def.clone().description,
+                        icon_normal: icon_normal.clone(),
+                        icon_locked: icon_locked.clone(),
+                        permission: def.permission,
+                        name: def.name.clone(),
+                        description: def.description.clone(),
                         global_achieved_percent,
                     });
                 }
@@ -370,10 +373,10 @@ impl<'a> AppManager {
                         .get_stat_float(&definition.base.id)
                     {
                         Ok(value) => value,
-                        Err(_) => {
-                            let stat_id = definition.base.id.to_string();
+                        Err(_stat_id) => {
+                            let _stat_id = definition.base.id.to_string();
                             dev_println!(
-                                "[APP SERVER] Failed to get float stat info for stat: {stat_id}"
+                                "[APP SERVER] Failed to get float stat info for stat: {_stat_id}"
                             );
                             continue;
                         }
@@ -401,10 +404,10 @@ impl<'a> AppManager {
                         .get_stat_i32(&definition.base.id)
                     {
                         Ok(value) => value,
-                        Err(_) => {
-                            let stat_id = definition.base.id.to_string();
+                        Err(_stat_id) => {
+                            let _stat_id = definition.base.id.to_string();
                             dev_println!(
-                                "[APP SERVER] Failed to get int stat info for stat: {stat_id}"
+                                "[APP SERVER] Failed to get int stat info for stat: {_stat_id}"
                             );
                             continue;
                         }

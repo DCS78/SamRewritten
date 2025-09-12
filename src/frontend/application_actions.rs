@@ -25,35 +25,31 @@ pub fn setup_app_actions(
     reset_all_stats_and_achievements_action: &SimpleAction,
 ) {
     let action_show_about_dialog = SimpleAction::new("about", None);
-    action_show_about_dialog.connect_activate({
-        let about_dialog = about_dialog.clone();
-        move |_, _| {
-            about_dialog.present();
-        }
+    let about_dialog_clone = about_dialog.clone();
+    action_show_about_dialog.connect_activate(move |_, _| {
+        about_dialog_clone.present();
     });
 
     let action_quit = SimpleAction::new("quit", None);
-    action_quit.connect_activate({
-        let application = application.clone();
-        move |_, _| {
-            application.quit();
-        }
+    let app_clone = application.clone();
+    action_quit.connect_activate(move |_, _| {
+        app_clone.quit();
     });
 
-    for action in [
+    [
         refresh_app_list_action,
         refresh_achievements_list_action,
         reset_all_stats_and_achievements_action,
         &action_show_about_dialog,
         &action_quit,
-    ] {
-        application.add_action(action);
-    }
+    ]
+    .iter()
+    .for_each(|action| application.add_action(*action));
 
     // Assign F5 to both refresh actions
-    for accel in ["app.refresh_app_list", "app.refresh_achievements_list"] {
-        application.set_accels_for_action(accel, &["F5"]);
-    }
+    ["app.refresh_app_list", "app.refresh_achievements_list"]
+        .iter()
+        .for_each(|accel| application.set_accels_for_action(accel, &["F5"]));
 }
 
 /// Enable or disable a named application action.

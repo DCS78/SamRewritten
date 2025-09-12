@@ -290,13 +290,15 @@ impl<'a> AppLister<'a> {
     /// Get all owned apps as AppModel.
     pub fn get_owned_apps(&self) -> Result<Vec<AppModel>, SamError> {
         let xml_games = self.get_xml_games()?;
-        let mut models = Vec::new();
-        for xml_game in xml_games.games {
+        let mut models = Vec::with_capacity(xml_games.games.len());
+        for xml_game in xml_games.games.iter() {
             let app_id: AppId_t = xml_game.app_id;
             match self.steam_apps.is_subscribed_app(app_id) {
                 Ok(true) => {
-                    let app = self.get_app(app_id, &xml_game)?;
-                    models.push(app);
+                    match self.get_app(app_id, xml_game) {
+                        Ok(app) => models.push(app),
+                        Err(_) => log::warn!("Failed to get app model for {}", app_id),
+                    }
                 }
                 Ok(false) => continue,
                 Err(e) => {

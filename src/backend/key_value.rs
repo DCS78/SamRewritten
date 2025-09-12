@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 use crate::backend::types::KeyValueEncoding;
+use itoa::Buffer as ItoaBuffer;
+use ryu::Buffer as RyuBuffer;
 use std::{
     collections::HashMap,
     error::Error,
@@ -156,10 +158,10 @@ impl KeyValue {
         }
         match &self.data {
             KeyValueData::String(s) => s.clone(),
-            KeyValueData::Int32(i) => i.to_string(),
-            KeyValueData::Float32(f) => f.to_string(),
-            KeyValueData::UInt64(u) => u.to_string(),
-            KeyValueData::Color(c) => c.to_string(),
+            KeyValueData::Int32(i) => ItoaBuffer::new().format(*i).to_string(),
+            KeyValueData::Float32(f) => RyuBuffer::new().format(*f).to_string(),
+            KeyValueData::UInt64(u) => ItoaBuffer::new().format(*u).to_string(),
+            KeyValueData::Color(c) => ItoaBuffer::new().format(*c).to_string(),
             KeyValueData::None => default.to_string(),
         }
     }
@@ -301,47 +303,30 @@ impl KeyValue {
             KeyValueEncoding::Utf8 => 1,
         };
 
-        let character_end = end.to_string();
-        let mut i = 0;
-        let mut data = vec![0u8; 128 * character_size];
+        let character_end = end as u8;
+        let mut data = Vec::with_capacity(128 * character_size);
 
         loop {
-            if i + character_size > data.len() {
-                data.resize(data.len() + (128 * character_size), 0);
-            }
-
-            let read = input.read(&mut data[i..i + character_size])?;
-            if read != character_size {
+            let mut buf = [0u8; 1];
+            let read = input.read(&mut buf)?;
+            if read != 1 {
                 return Err(KeyValueError::Io(std::io::Error::new(
                     std::io::ErrorKind::UnexpectedEof,
                     "Failed to read expected number of bytes",
                 )));
             }
-
-            let slice = &data[i..i + character_size];
-            let s = match encoding {
-                KeyValueEncoding::Utf8 => match std::str::from_utf8(slice) {
-                    Ok(val) => val,
-                    Err(e) => {
-                        eprintln!("KeyValue::read_string_internal_dynamic: invalid utf8: {}", e);
-                        ""
-                    }
-                },
-            };
-
-            if s == character_end {
+            if buf[0] == character_end {
                 break;
             }
-
-            i += character_size;
+            data.push(buf[0]);
         }
 
-        if i == 0 {
+        if data.is_empty() {
             return Ok(String::new());
         }
 
         match encoding {
-            KeyValueEncoding::Utf8 => match String::from_utf8(data[..i].to_vec()) {
+            KeyValueEncoding::Utf8 => match String::from_utf8(data) {
                 Ok(val) => Ok(val),
                 Err(e) => {
                     eprintln!("KeyValue::read_string_internal_dynamic: invalid utf8: {}", e);

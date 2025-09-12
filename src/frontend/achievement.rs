@@ -25,17 +25,22 @@ glib::wrapper! {
 impl GAchievementObject {
     /// Create a new GAchievementObject from AchievementInfo.
     pub fn new(info: AchievementInfo) -> Self {
-        let global_achieved_percent = match info.global_achieved_percent {
-            Some(val) => val,
-            _none => {
-                log::warn!("global_achieved_percent is None, using 0.0 as default");
-                0.0
-            }
-        };
+        let global_achieved_percent = info.global_achieved_percent.unwrap_or_else(|| {
+            log::warn!("global_achieved_percent is None, using 0.0 as default");
+            0.0
+        });
         let global_achieved_percent_ok = info.global_achieved_percent.is_some();
-
+        let search_text = if info.description.is_empty() {
+            info.name.clone()
+        } else {
+            let mut s = String::with_capacity(info.name.len() + 1 + info.description.len());
+            s.push_str(&info.name);
+            s.push(' ');
+            s.push_str(&info.description);
+            s
+        };
         Object::builder()
-            .property("search-text", format!("{} {}", info.name, info.description))
+            .property("search-text", search_text)
             .property("id", info.id)
             .property("name", info.name)
             .property("description", info.description)

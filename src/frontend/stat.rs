@@ -26,9 +26,9 @@ impl GStatObject {
     pub fn new(info: StatInfo) -> Self {
         match info {
             StatInfo::Float(info) => Object::builder()
-                .property("id", info.id)
+                .property("id", &info.id)
                 .property("app-id", info.app_id)
-                .property("display-name", info.display_name)
+                .property("display-name", &info.display_name)
                 .property("original-value", info.original_value as f64)
                 .property("current-value", info.float_value as f64)
                 .property("is-increment-only", info.is_increment_only)
@@ -36,9 +36,9 @@ impl GStatObject {
                 .property("is-integer", false)
                 .build(),
             StatInfo::Integer(info) => Object::builder()
-                .property("id", info.id)
+                .property("id", &info.id)
                 .property("app-id", info.app_id)
-                .property("display-name", info.display_name)
+                .property("display-name", &info.display_name)
                 .property("original-value", info.original_value as f64)
                 .property("current-value", info.int_value as f64)
                 .property("is-increment-only", info.is_increment_only)

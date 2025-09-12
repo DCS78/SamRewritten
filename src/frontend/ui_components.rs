@@ -52,18 +52,22 @@ pub fn load_logo() -> Paintable {
     } else {
         eprintln!("[CLIENT] Failed to load logo. Using a gray square.");
         // Always try to create a 1x1 gray pixbuf as fallback
-        if let Some(p) = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1) {
-            p.fill(0x808080FF);
-            Texture::for_pixbuf(&p).into()
-        } else {
-            eprintln!("[CLIENT] Failed to create minimal pixbuf fallback. Returning default Paintable.");
-            // As a last resort, return an empty Texture (1x1 transparent)
-            let fallback = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1)
-                .map(|p| { p.fill(0x00000000); p })
-                .unwrap();
-            Texture::for_pixbuf(&fallback).into()
-        }
+        let fallback_pixbuf = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1)
+            .map(|p| { p.fill(0x808080FF); p })
+            .unwrap_or_else(|| {
+                eprintln!("[CLIENT] Failed to create minimal pixbuf fallback. Returning default Paintable.");
+                let p = Pixbuf::new(Colorspace::Rgb, true, 8, 1, 1).unwrap();
+                p.fill(0x00000000);
+                p
+            });
+        Texture::for_pixbuf(&fallback_pixbuf).into()
     }
+}
+
+/// Helper to set common menu items.
+fn set_common_menu_items(menu_model: &gtk::gio::Menu) {
+    menu_model.append(Some("About"), Some("app.about"));
+    menu_model.append(Some("Quit"), Some("app.quit"));
 }
 
 /// Create a context menu button with a popover and menu model.
@@ -95,8 +99,7 @@ pub fn set_context_popover_to_app_list_context(
 ) {
     menu_model.remove_all();
     menu_model.append(Some("Refresh app list"), Some("app.refresh_app_list"));
-    menu_model.append(Some("About"), Some("app.about"));
-    menu_model.append(Some("Quit"), Some("app.quit"));
+    set_common_menu_items(menu_model);
     set_app_action_enabled(&application, "refresh_achievements_list", false);
 }
 
@@ -114,7 +117,6 @@ pub fn set_context_popover_to_app_details_context(
         Some("Reset everything"),
         Some("app.clear_all_stats_and_achievements"),
     );
-    menu_model.append(Some("About"), Some("app.about"));
-    menu_model.append(Some("Quit"), Some("app.quit"));
+    set_common_menu_items(menu_model);
     set_app_action_enabled(&application, "refresh_app_list", false);
 }

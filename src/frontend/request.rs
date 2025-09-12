@@ -27,40 +27,31 @@ pub trait Request: Into<SteamCommand> + Debug + Clone {
     type Response: DeserializeOwned;
 
     fn request(self) -> Result<Self::Response, SamError> {
-        let mut guard = match DEFAULT_PROCESS.write() {
-            Ok(g) => g,
-            Err(e) => {
-                eprintln!("[CLIENT] Failed to lock DEFAULT_PROCESS: {e}");
-                return Err(SamError::SocketCommunicationFailed);
-            }
-        };
+        let mut guard = DEFAULT_PROCESS.write().map_err(|e| {
+            eprintln!("[CLIENT] Failed to lock DEFAULT_PROCESS: {e}");
+            SamError::SocketCommunicationFailed
+        })?;
         if let Some(ref mut bidir) = *guard {
             let command: SteamCommand = self.clone().into();
             dev_println!("[CLIENT] Sending command: {:?}", command);
             let command = command.sam_serialize();
-            if let Err(e) = bidir.tx.write_all(&command) {
+            bidir.tx.write_all(&command).map_err(|e| {
                 eprintln!("[CLIENT] Error writing command to pipe: {e}");
-                return Err(SamError::SocketCommunicationFailed);
-            }
+                SamError::SocketCommunicationFailed
+            })?;
 
             let mut buffer_len = [0u8; std::mem::size_of::<usize>()];
-            match bidir.rx.read_exact(&mut buffer_len) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("[CLIENT] Error reading length from pipe: {e}");
-                    return Err(SamError::SocketCommunicationFailed);
-                }
-            }
+            bidir.rx.read_exact(&mut buffer_len).map_err(|e| {
+                eprintln!("[CLIENT] Error reading length from pipe: {e}");
+                SamError::SocketCommunicationFailed
+            })?;
 
             let data_length = usize::from_le_bytes(buffer_len);
             let mut buffer = vec![0u8; data_length];
-            match bidir.rx.read_exact(&mut buffer) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("[CLIENT] Error reading message from pipe: {e}");
-                    return Err(SamError::SocketCommunicationFailed);
-                }
-            };
+            bidir.rx.read_exact(&mut buffer).map_err(|e| {
+                eprintln!("[CLIENT] Error reading message from pipe: {e}");
+                SamError::SocketCommunicationFailed
+            })?;
 
             let message = String::from_utf8_lossy(&buffer);
             serde_json::from_str::<SteamResponse<Self::Response>>(&message)

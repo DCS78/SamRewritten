@@ -15,13 +15,16 @@
 
 use std::convert::TryFrom;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 /// Supported encodings for key-value data.
 pub enum KeyValueEncoding {
     Utf8,
 }
 
-/// Types of user statistics supported by Steam.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+/// Types of user statistics supported by Steam.
 pub enum UserStatType {
     Invalid = 0,
     Integer = 1,
@@ -32,7 +35,7 @@ pub enum UserStatType {
 }
 
 impl TryFrom<u8> for UserStatType {
-    type Error = String;
+    type Error = &'static str;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -42,7 +45,7 @@ impl TryFrom<u8> for UserStatType {
             3 => Ok(Self::AverageRate),
             4 => Ok(Self::Achievements),
             5 => Ok(Self::GroupAchievements),
-            _ => Err(format!("Invalid UserStatType value: {}", value)),
+            _ => Err("Invalid UserStatType value"),
         }
     }
 }

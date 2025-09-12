@@ -50,10 +50,18 @@ fn send_app_command(bidir: &mut BidirChild, command: SteamCommand) -> Vec<u8> {
         return SteamResponse::<()>::Error(SamError::SocketCommunicationFailed).sam_serialize();
     }
 
+    // Directly return the full message (length + buffer) in a single allocation
     let mut result = Vec::with_capacity(buffer_len.len() + buffer.len());
     result.extend_from_slice(&buffer_len);
     result.extend_from_slice(&buffer);
     result
+}
+
+/// Helper to send a response and log errors concisely.
+fn send_response<T: AsRef<[u8]>>(tx: &mut Sender, response: T, context: &str) {
+    if let Err(e) = tx.write_all(response.as_ref()) {
+        eprintln!("[ORCHESTRATOR] Failed to send response ({}): {e}", context);
+    }
 }
 
 /// Main backend event loop: handles Steam connection, app processes, and command dispatch.
@@ -86,7 +94,7 @@ pub fn orchestrator(parent_tx: &mut Sender, parent_rx: &mut Recver) -> i32 {
 
             connected_steam = match ConnectedSteam::new() {
                 Ok(c) => Some(c),
-                Err(e) => {
+                Err(_e) => {
                     dev_println!("[ORCHESTRATOR] Error connecting to Steam: {e}");
                     let response: SteamResponse<String> =
                         SteamResponse::Error(SamError::SteamConnectionFailed);
@@ -121,7 +129,7 @@ fn process_command(
     connected_steam: &mut ConnectedSteam,
 ) -> bool {
     match command {
-    SteamCommand::GetOwnedAppList => {
+        SteamCommand::GetOwnedAppList => {
             dev_println!("[ORCHESTRATOR] Received GetOwnedAppList");
             let apps_001 = &connected_steam.apps_001;
             let apps = &connected_steam.apps;
@@ -129,57 +137,36 @@ fn process_command(
 
             match app_lister.get_owned_apps() {
                 Ok(apps) => {
-                    let response = SteamResponse::Success(apps);
-                    let response = response.sam_serialize();
-                    if let Err(e) = tx.write_all(&response) {
-                        eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                    }
+                    let response = SteamResponse::Success(apps).sam_serialize();
+                    send_response(tx, response, "GetOwnedAppList");
                 }
                 Err(e) => {
                     dev_println!("[ORCHESTRATOR] Error getting owned apps: {e}");
-                    let response = SteamResponse::<()>::Error(e);
-                    let response = response.sam_serialize();
-                    if let Err(e) = tx.write_all(&response) {
-                        eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                    }
+                    let response = SteamResponse::<()>::Error(e).sam_serialize();
+                    send_response(tx, response, "GetOwnedAppList Error");
                 }
             };
         }
-
         SteamCommand::LaunchApp(app_id) => {
             dev_println!("[ORCHESTRATOR] LaunchApp {}", app_id);
-
             #[cfg(debug_assertions)]
             if app_id == 0 {
                 let response = SteamResponse::<bool>::Success(true).sam_serialize();
-                    if let Err(e) = tx.write_all(&response) {
-                        eprintln!("[APP SERVER] Failed to send response: {e}");
-                    }
+                send_response(tx, response, "LaunchApp dev");
                 return true;
             }
-
-            // 1. Check if we own a process for this app
             if children_processes.contains_key(&app_id) {
                 eprintln!("[ORCHESTRATOR] App {} is already running", app_id);
-                let response: SteamResponse<()> = SteamResponse::Error(SamError::UnknownError);
-                let response = response.sam_serialize();
-                    if let Err(e) = tx.write_all(&response) {
-                        eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                    }
+                let response = SteamResponse::<()>::Error(SamError::UnknownError).sam_serialize();
+                send_response(tx, response, "LaunchApp already running");
                 return true;
             }
-
-            // 2. Launch the process
-
             let current_exe = match get_executable_path() {
                 Ok(path) => path,
                 Err(e) => {
                     eprintln!("[ORCHESTRATOR] Failed to get executable path: {e}");
-                    let response: SteamResponse<()> = SteamResponse::Error(SamError::UnknownError);
-                    let response = response.sam_serialize();
-                        if let Err(e) = tx.write_all(&response) {
-                            eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                        }
+                    let response = SteamResponse::<()>::Error(SamError::UnknownError).sam_serialize();
+                    send_response(tx, response, "LaunchApp exe path error");
                     return true;
                 }
             };
@@ -187,43 +174,28 @@ fn process_command(
                 Ok(child) => child,
                 Err(e) => {
                     eprintln!("[ORCHESTRATOR] Could not create app server process: {e}");
-                    let response: SteamResponse<()> = SteamResponse::Error(SamError::UnknownError);
-                    let response = response.sam_serialize();
-                        if let Err(e) = tx.write_all(&response) {
-                            eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                        }
+                    let response = SteamResponse::<()>::Error(SamError::UnknownError).sam_serialize();
+                    send_response(tx, response, "LaunchApp child error");
                     return true;
                 }
             };
-
             children_processes.insert(app_id, child);
-            let response = SteamResponse::Success(true);
-            let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+            let response = SteamResponse::Success(true).sam_serialize();
+            send_response(tx, response, "LaunchApp success");
         }
-
         SteamCommand::StopApp(app_id) => {
             #[cfg(debug_assertions)]
             if app_id == 0 {
                 let response = SteamResponse::<bool>::Success(true).sam_serialize();
-                    if let Err(e) = tx.write_all(&response) {
-                        eprintln!("[APP SERVER] Failed to send response: {e}");
-                    }
+                send_response(tx, response, "StopApp dev");
                 return true;
             }
-
             if !children_processes.contains_key(&app_id) {
                 eprintln!("[ORCHESTRATOR] App {} is not running", app_id);
-                let response: SteamResponse<()> = SteamResponse::Error(SamError::UnknownError);
-                let response = response.sam_serialize();
-                    if let Err(e) = tx.write_all(&response) {
-                        eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                    }
+                let response = SteamResponse::<()>::Error(SamError::UnknownError).sam_serialize();
+                send_response(tx, response, "StopApp not running");
                 return true;
             }
-
             let mut bidir_opt = children_processes.remove(&app_id);
             let bidir = match bidir_opt.as_mut() {
                 Some(b) => b,
@@ -233,63 +205,41 @@ fn process_command(
                 }
             };
             let response = send_app_command(bidir, SteamCommand::Shutdown);
-
             if let Err(e) = bidir.child.wait() {
                 eprintln!("[ORCHESTRATOR] Failed to wait child process: {e}");
             }
-
-            if let Err(e) = tx.write_all(&response) {
-                eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-            }
+            send_response(tx, response, "StopApp");
         }
-
         SteamCommand::StopApps => {
             dev_println!("[ORCHESTRATOR] StopApps");
-
-            for (app_id, child) in children_processes.iter_mut() {
+            for (_app_id, child) in children_processes.iter_mut() {
                 send_app_command(child, SteamCommand::Shutdown);
                 dev_println!("[ORCHESTRATOR] Sent shutdown command to app {app_id}");
                 if let Err(e) = child.child.wait() {
                     eprintln!("[ORCHESTRATOR] Failed to wait child process: {e}");
                 }
             }
-
             children_processes.clear();
-
-            let response = SteamResponse::Success(true);
-            let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+            let response = SteamResponse::Success(true).sam_serialize();
+            send_response(tx, response, "StopApps");
         }
-
         SteamCommand::Shutdown => {
-            for (app_id, child) in children_processes.iter_mut() {
+            for (_app_id, child) in children_processes.iter_mut() {
                 send_app_command(child, SteamCommand::Shutdown);
                 dev_println!("[ORCHESTRATOR] Sent shutdown command to app {app_id}");
                 if let Err(e) = child.child.wait() {
                     eprintln!("[ORCHESTRATOR] Failed to wait child process: {e}");
                 }
             }
-
             connected_steam.shutdown();
-
-            let response = SteamResponse::Success(true);
-            let response = response.sam_serialize();
-            if let Err(e) = tx.write_all(&response) {
-                eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-            }
+            let response = SteamResponse::Success(true).sam_serialize();
+            send_response(tx, response, "Shutdown");
             return false;
         }
-
         SteamCommand::Status => {
-            let response = SteamResponse::Success(true);
-            let response = response.sam_serialize();
-            if let Err(e) = tx.write_all(&response) {
-                eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-            }
+            let response = SteamResponse::Success(true).sam_serialize();
+            send_response(tx, response, "Status");
         }
-
         SteamCommand::GetAchievements(app_id) => {
             #[cfg(debug_assertions)]
             if app_id == 0 {
@@ -308,128 +258,78 @@ fn process_command(
                     };
                     ach_infos.push(ach_info);
                 }
-
-                let response =
-                    SteamResponse::<Vec<AchievementInfo>>::Success(ach_infos).sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[APP SERVER] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<Vec<AchievementInfo>>::Success(ach_infos).sam_serialize();
+                send_response(tx, response, "GetAchievements dev");
                 return true;
             }
-
             if let Some(bidir) = children_processes.get_mut(&app_id) {
                 let response = send_app_command(bidir, SteamCommand::GetAchievements(app_id));
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                send_response(tx, response, "GetAchievements");
             } else {
-                let response = SteamResponse::<()>::Error(SamError::AppMismatchError);
-                let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<()>::Error(SamError::AppMismatchError).sam_serialize();
+                send_response(tx, response, "GetAchievements not running");
             }
         }
-
         SteamCommand::GetStats(app_id) => {
             #[cfg(debug_assertions)]
             if app_id == 0 {
                 let response = SteamResponse::<Vec<StatInfo>>::Success(vec![]).sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[APP SERVER] Failed to send response: {e}");
-                }
+                send_response(tx, response, "GetStats dev");
                 return true;
             }
-
             if let Some(bidir) = children_processes.get_mut(&app_id) {
                 let response = send_app_command(bidir, SteamCommand::GetStats(app_id));
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                send_response(tx, response, "GetStats");
             } else {
-                let response = SteamResponse::<()>::Error(SamError::AppMismatchError);
-                let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<()>::Error(SamError::AppMismatchError).sam_serialize();
+                send_response(tx, response, "GetStats not running");
             }
         }
-
         SteamCommand::SetAchievement(app_id, unlocked, achievement_id) => {
             #[cfg(debug_assertions)]
             if app_id == 0 {
                 let response = SteamResponse::<bool>::Success(true).sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[APP SERVER] Failed to send response: {e}");
-                }
+                send_response(tx, response, "SetAchievement dev");
                 return true;
             }
-
             if let Some(bidir) = children_processes.get_mut(&app_id) {
                 let response = send_app_command(
                     bidir,
                     SteamCommand::SetAchievement(app_id, unlocked, achievement_id),
                 );
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                send_response(tx, response, "SetAchievement");
             } else {
-                let response = SteamResponse::<()>::Error(SamError::AppMismatchError);
-                let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<()>::Error(SamError::AppMismatchError).sam_serialize();
+                send_response(tx, response, "SetAchievement not running");
             }
         }
-
         SteamCommand::SetIntStat(app_id, stat_id, value) => {
             if let Some(bidir) = children_processes.get_mut(&app_id) {
-                let response =
-                    send_app_command(bidir, SteamCommand::SetIntStat(app_id, stat_id, value));
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = send_app_command(bidir, SteamCommand::SetIntStat(app_id, stat_id, value));
+                send_response(tx, response, "SetIntStat");
             } else {
-                let response = SteamResponse::<()>::Error(SamError::AppMismatchError);
-                let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<()>::Error(SamError::AppMismatchError).sam_serialize();
+                send_response(tx, response, "SetIntStat not running");
             }
         }
-
         SteamCommand::SetFloatStat(app_id, stat_id, value) => {
             if let Some(bidir) = children_processes.get_mut(&app_id) {
-                let response =
-                    send_app_command(bidir, SteamCommand::SetFloatStat(app_id, stat_id, value));
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = send_app_command(bidir, SteamCommand::SetFloatStat(app_id, stat_id, value));
+                send_response(tx, response, "SetFloatStat");
             } else {
-                let response = SteamResponse::<()>::Error(SamError::AppMismatchError);
-                let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<()>::Error(SamError::AppMismatchError).sam_serialize();
+                send_response(tx, response, "SetFloatStat not running");
             }
         }
-
         SteamCommand::ResetStats(app_id, achievements_too) => {
             if let Some(bidir) = children_processes.get_mut(&app_id) {
-                let response =
-                    send_app_command(bidir, SteamCommand::ResetStats(app_id, achievements_too));
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = send_app_command(bidir, SteamCommand::ResetStats(app_id, achievements_too));
+                send_response(tx, response, "ResetStats");
             } else {
-                let response = SteamResponse::<()>::Error(SamError::AppMismatchError);
-                let response = response.sam_serialize();
-                if let Err(e) = tx.write_all(&response) {
-                    eprintln!("[ORCHESTRATOR] Failed to send response: {e}");
-                }
+                let response = SteamResponse::<()>::Error(SamError::AppMismatchError).sam_serialize();
+                send_response(tx, response, "ResetStats not running");
             }
         }
     };
-
     true
 }

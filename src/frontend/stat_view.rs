@@ -98,13 +98,10 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
         stat_box.append(&protected_icon);
 
         stat_box.append(&button_box);
-        let list_item = list_item
-            .downcast_ref::<gtk::ListItem>();
-        if let Some(list_item) = list_item {
+        if let Some(list_item) = list_item.downcast_ref::<gtk::ListItem>() {
             list_item.set_child(Some(&stat_box));
 
-            // All property_expression and binding code must be inside this block
-            // Expression bindings
+            // Property expressions and bindings
             list_item
                 .property_expression("item")
                 .chain_property::<GStatObject>("display-name")
@@ -124,55 +121,27 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             let is_integer_expr = list_item
                 .property_expression("item")
                 .chain_property::<GStatObject>("is-integer");
-
-            let is_integer_expr_2 = list_item
-                .property_expression("item")
-                .chain_property::<GStatObject>("is-integer");
-
+            let is_integer_expr_2 = is_integer_expr.clone();
             let is_increment_only_expr = list_item
                 .property_expression("item")
                 .chain_property::<GStatObject>("is-increment-only");
-
             let original_value_expr = list_item
                 .property_expression("item")
                 .chain_property::<GStatObject>("original-value");
-
             let permission_expr = list_item
                 .property_expression("item")
                 .chain_property::<GStatObject>("permission");
+            let permission_expr_2 = permission_expr.clone();
 
-            let permission_expr_2 = list_item
-                .property_expression("item")
-                .chain_property::<GStatObject>("permission");
-
-            let adjustment_step_increment_closure =
-                glib::RustClosure::new(|values: &[glib::Value]| {
-                    let is_integer = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
-                        Some(val) => val,
-                        _none => {
-                            log::warn!("Failed to get is_integer as bool in adjustment_step_increment_closure");
-                            false
-                        }
-                    };
-                    let step_increment = if is_integer { 1.0 } else { 0.01 };
-                    Some(step_increment.to_value())
-                });
+            let adjustment_step_increment_closure = glib::RustClosure::new(|values: &[glib::Value]| {
+                let is_integer = values.get(1).and_then(|val| val.get::<bool>().ok()).unwrap_or(false);
+                let step_increment = if is_integer { 1.0 } else { 0.01 };
+                Some(step_increment.to_value())
+            });
 
             let adjustment_lower_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-                let original_value = match values.get(1).and_then(|val| val.get::<f64>().ok()) {
-                    Some(val) => val,
-                    _none => {
-                        log::warn!("Failed to get original_value as f64 in adjustment_lower_closure");
-                        0f64
-                    }
-                };
-                let is_increment_only = match values.get(2).and_then(|val| val.get::<bool>().ok()) {
-                    Some(val) => val,
-                    _none => {
-                        log::warn!("Failed to get is_increment_only as bool in adjustment_lower_closure");
-                        false
-                    }
-                };
+                let original_value = values.get(1).and_then(|val| val.get::<f64>().ok()).unwrap_or(0f64);
+                let is_increment_only = values.get(2).and_then(|val| val.get::<bool>().ok()).unwrap_or(false);
                 let lower = if is_increment_only {
                     original_value
                 } else {
@@ -182,37 +151,19 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
             });
 
             let spin_button_digits_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-                let is_integer = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
-                    Some(val) => val,
-                    _none => {
-                        log::warn!("Failed to get is_integer as bool in spin_button_digits_closure");
-                        false
-                    }
-                };
+                let is_integer = values.get(1).and_then(|val| val.get::<bool>().ok()).unwrap_or(false);
                 let digits: u32 = if is_integer { 0 } else { 2 };
                 Some(digits.to_value())
             });
 
             let permission_sensitive_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-                let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
-                    Some(val) => val,
-                    _none => {
-                        log::warn!("Failed to get permission as i32 in permission_sensitive_closure");
-                        0
-                    }
-                };
+                let permission = values.get(1).and_then(|val| val.get::<i32>().ok()).unwrap_or(0);
                 let is_sensitive = (permission & 2) == 0;
                 Some(is_sensitive.to_value())
             });
 
             let permission_protected_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-                let permission = match values.get(1).and_then(|val| val.get::<i32>().ok()) {
-                    Some(val) => val,
-                    _none => {
-                        log::warn!("Failed to get permission as i32 in permission_protected_closure");
-                        0
-                    }
-                };
+                let permission = values.get(1).and_then(|val| val.get::<i32>().ok()).unwrap_or(0);
                 let is_protected = (permission & 2) != 0;
                 Some(is_protected.to_value())
             });
@@ -241,9 +192,6 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
         } else {
             log::error!("list_item was not a ListItem; skipping child set");
         }
-
-    // All property_expression and binding code is now inside the if let block above.
-    // (Redundant closure code removed; all logic is now handled above with logging.)
     });
 
     stats_list_factory.connect_bind(move |_, list_item| unsafe {
@@ -263,80 +211,80 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                 return;
             }
         };
-        let spin_button = match list_item
+        // Optimized: direct traversal, no unnecessary clones
+        let spin_button = list_item
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
             .and_then(|stat_box| stat_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok())
             .and_then(|button_box| button_box.last_child())
-            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok()) {
-            Some(sb) => sb,
-            _ => {
-                log::error!("Could not find SpinButton widget");
-                return;
-            }
+            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok());
+        let Some(spin_button) = spin_button else {
+            log::error!("Could not find SpinButton widget");
+            return;
         };
 
-        let sender = RefCell::new(channel::<f64>().0);
+        // Use a single sender per bind, avoid unnecessary channel recreation
+        let (sender, _) = channel::<f64>();
+        let sender = RefCell::new(sender);
 
-        let handler_id = spin_button.connect_value_changed(move |button| {
-            let val = button.value();
-            if sender.borrow_mut().send(val).is_ok() {
-                return;
-            }
-            let (new_sender, receiver) = channel();
-            *sender.borrow_mut() = new_sender;
-            let mut value = val;
-            let integer_stat = stat_object.is_integer();
-            let stat_id = stat_object.id().clone();
-            let stat_object_clone = stat_object.clone();
-            let app_id = stat_object.app_id().clone();
+        let handler_id = spin_button.connect_value_changed({
+            let stat_object = stat_object.clone();
+            move |button| {
+                let val = button.value();
+                if sender.borrow_mut().send(val).is_ok() {
+                    return;
+                }
+                // Only recreate channel if send fails
+                let (new_sender, new_receiver) = channel();
+                *sender.borrow_mut() = new_sender;
+                let mut value = val;
+                let integer_stat = stat_object.is_integer();
+                let stat_id = stat_object.id().clone();
+                let stat_object_clone = stat_object.clone();
+                let app_id = stat_object.app_id().clone();
 
-            glib::spawn_future_local(async move {
-                let join_handle = spawn_blocking(move || {
-                    while let Ok(new) = receiver.recv_timeout(Duration::from_millis(500)) {
-                        value = (new * 100.0).round() / 100.0;
-                    }
-
-                    let res = if integer_stat {
-                        SetIntStat {
-                            app_id,
-                            stat_id,
-                            value: value.round() as i32,
+                glib::spawn_future_local(async move {
+                    let join_handle = spawn_blocking(move || {
+                        while let Ok(new) = new_receiver.recv_timeout(Duration::from_millis(500)) {
+                            value = (new * 100.0).round() / 100.0;
                         }
-                        .request()
+                        let res = if integer_stat {
+                            SetIntStat {
+                                app_id,
+                                stat_id,
+                                value: value.round() as i32,
+                            }
+                            .request()
+                        } else {
+                            SetFloatStat {
+                                app_id,
+                                stat_id,
+                                value: value as f32,
+                            }
+                            .request()
+                        };
+                        match res {
+                            Ok(success) if success => (true, value),
+                            _ => (false, value),
+                        }
+                    });
+                    let (success, debounced_value) =
+                        match join_handle.await {
+                            Ok((success, debounced_value)) => (success, debounced_value),
+                            Err(e) => {
+                                log::error!("spawn_blocking task panicked: {:?}", e);
+                                (false, value)
+                            }
+                        };
+                    if success {
+                        stat_object_clone.set_original_value(debounced_value);
                     } else {
-                        SetFloatStat {
-                            app_id,
-                            stat_id,
-                            value: value as f32,
-                        }
-                        .request()
-                    };
-
-                    match res {
-                        Ok(success) if success => (true, value),
-                        _ => (false, value),
+                        stat_object_clone.set_current_value(stat_object_clone.original_value());
                     }
                 });
-
-                let (success, debounced_value) =
-                    match join_handle.await {
-                        Ok((success, debounced_value)) => (success, debounced_value),
-                        Err(e) => {
-                            log::error!("spawn_blocking task panicked: {:?}", e);
-                            (false, value)
-                        }
-                    };
-
-                if success {
-                    stat_object_clone.set_original_value(debounced_value);
-                } else {
-                    stat_object_clone.set_current_value(stat_object_clone.original_value());
-                }
-            });
+            }
         });
-
         spin_button.set_data("handler", handler_id.as_raw());
     });
 
@@ -348,20 +296,17 @@ pub fn create_stats_view() -> (Frame, ListStore, StringFilter) {
                 return;
             }
         };
-        let spin_button = match list_item
+        let spin_button = list_item
             .child()
             .and_then(|child| child.downcast::<Box>().ok())
             .and_then(|stat_box| stat_box.last_child())
             .and_then(|button_box| button_box.downcast::<Box>().ok())
             .and_then(|button_box| button_box.last_child())
-            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok()) {
-            Some(sb) => sb,
-            _ => {
-                log::error!("Could not find SpinButton widget");
-                return;
-            }
+            .and_then(|spin_button_widget| spin_button_widget.downcast::<SpinButton>().ok());
+        let Some(spin_button) = spin_button else {
+            log::error!("Could not find SpinButton widget");
+            return;
         };
-
         // Disconnect previous handler if it exists
         if let Some(handler_id) = spin_button.data("handler") {
             let ulong: c_ulong = *handler_id.as_ptr();

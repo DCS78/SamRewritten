@@ -51,6 +51,20 @@ impl AppStackPage {
     }
 }
 
+/// Helper to create a labeled value box with consistent layout
+fn create_labeled_value_box(label: &str, value: &gtk::Label, margin_top: i32) -> gtk::Box {
+    let label_widget = gtk::Label::builder().label(label).halign(gtk::Align::Start).build();
+    let spacer = gtk::Box::builder().hexpand(true).build();
+    let box_widget = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .margin_top(margin_top)
+        .build();
+    box_widget.append(&label_widget);
+    box_widget.append(&spacer);
+    box_widget.append(value);
+    box_widget
+}
+
 /// Create the main app view, including sidebar, achievements, and stats.
 pub fn create_app_view(
     app_id: Rc<Cell<Option<u32>>>,
@@ -80,50 +94,48 @@ pub fn create_app_view(
     Arc<AtomicBool>,
     Stack,
 ) {
-    let app_spinner = Spinner::builder().spinning(true).margin_end(5).build();
-    let app_spinner_label = Label::builder().label("Loading...").build();
-    let app_spinner_box = Box::builder().halign(Align::Center).build();
-    app_spinner_box.append(&app_spinner);
-    app_spinner_box.append(&app_spinner_label);
+    // Spinner and loading label
+    let app_spinner_box = {
+        let spinner = Spinner::builder().spinning(true).margin_end(5).build();
+        let label = Label::builder().label("Loading...").build();
+        let box_ = Box::builder().halign(Align::Center).build();
+        box_.append(&spinner);
+        box_.append(&label);
+        box_
+    };
 
-    let _app_achievement_count_label = Label::builder()
-        .label("Achievements:")
-        .halign(Align::Start)
-        .build();
+    // Sidebar value boxes
     let app_achievement_count_value = Label::builder().halign(Align::End).build();
     let app_achievement_count_box = create_labeled_value_box(
         "Achievements:",
         &app_achievement_count_value,
         10,
     );
-
     let app_stats_count_value = Label::builder().halign(Align::End).build();
     let app_stats_count_box = create_labeled_value_box("Stats:", &app_stats_count_value, 10);
-
     let app_type_value = Label::builder().halign(Align::End).build();
     let app_type_box = create_labeled_value_box("Type:", &app_type_value, 10);
-
     let app_developer_value = Label::builder()
         .halign(Align::End)
         .ellipsize(EllipsizeMode::End)
         .build();
     let app_developer_box = create_labeled_value_box("Developer:", &app_developer_value, 20);
-
     let app_metacritic_value = Label::builder().halign(Align::End).build();
     let app_metacritic_box = create_labeled_value_box("Metacritic:", &app_metacritic_value, 10);
 
+    // Status labels
     let app_loading_failed_label = Label::builder()
         .label("Failed to load app.")
         .halign(Align::Center)
         .valign(Align::Center)
         .build();
-
     let app_no_entries_value = Label::builder()
         .label("No entries found.")
         .halign(Align::Center)
         .valign(Align::Center)
         .build();
 
+    // App title/description label
     let app_label = Label::builder()
         .margin_top(20)
         .wrap(true)
@@ -131,9 +143,16 @@ pub fn create_app_view(
         .halign(Align::Start)
         .build();
 
+    // App image
     let app_shimmer_image = ShimmerImage::new();
     app_shimmer_image.set_halign(Align::Start);
+    // Wrap shimmer image in a Box for sidebar compatibility
+    let app_shimmer_image_box = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .build();
+    app_shimmer_image_box.append(&app_shimmer_image);
 
+    // Sidebar buttons
     let app_achievements_button = ToggleButton::builder().label("Achievements").build();
     let app_stats_button = ToggleButton::builder()
         .label("Stats")
@@ -152,11 +171,13 @@ pub fn create_app_view(
     app_button_box.append(&app_achievements_button);
     app_button_box.append(&app_stats_button);
 
+    // Sidebar separator
     let app_sidebar_separator = Separator::builder()
         .orientation(Orientation::Horizontal)
         .margin_top(20)
         .build();
 
+    // Sidebar layout
     let app_sidebar = Box::builder()
         .orientation(Orientation::Vertical)
         .margin_top(20)
@@ -164,16 +185,22 @@ pub fn create_app_view(
         .margin_start(20)
         .margin_end(20)
         .build();
+    // Append widgets in correct order, handling types properly
     app_sidebar.append(&app_button_box);
-    app_sidebar.append(&app_shimmer_image);
-    app_sidebar.append(&app_label);
+    app_sidebar.append(&app_shimmer_image_box);
+    app_sidebar.append(&app_label); // Label appended directly
     app_sidebar.append(&app_sidebar_separator);
-    app_sidebar.append(&app_developer_box);
-    app_sidebar.append(&app_metacritic_box);
-    app_sidebar.append(&app_achievement_count_box);
-    app_sidebar.append(&app_stats_count_box);
-    app_sidebar.append(&app_type_box);
+    for widget in [
+        &app_developer_box,
+        &app_metacritic_box,
+        &app_achievement_count_box,
+        &app_stats_count_box,
+        &app_type_box,
+    ] {
+        app_sidebar.append(widget);
+    }
 
+    // Main content views
     let (
         app_achievements_stack,
         app_achievements_model,
@@ -188,9 +215,9 @@ pub fn create_app_view(
         application,
         &app_achievement_count_value,
     );
-
     let (app_stat_scrolled_window, app_stat_model, app_stat_string_filter) = create_stats_view();
 
+    // Main stack
     let app_stack = Stack::builder()
         .transition_type(StackTransitionType::SlideLeftRight)
         .build();
@@ -200,6 +227,7 @@ pub fn create_app_view(
     app_stack.add_named(&app_no_entries_value, Some(AppStackPage::Empty.as_str()));
     app_stack.add_named(&app_spinner_box, Some(AppStackPage::Loading.as_str()));
 
+    // Stack page change logic
     app_stack.connect_visible_child_name_notify(clone!(
         #[weak]
         app_achievements_button,
@@ -227,6 +255,7 @@ pub fn create_app_view(
         }
     ));
 
+    // Button click logic
     app_achievements_button.connect_clicked(clone!(
         #[weak]
         app_stack,
@@ -240,7 +269,6 @@ pub fn create_app_view(
             }
         }
     ));
-
     app_stats_button.connect_clicked(clone!(
         #[weak]
         app_stack,
@@ -255,7 +283,7 @@ pub fn create_app_view(
         }
     ));
 
-    // Create app pane with sidebar and main content
+    // App pane layout
     let app_pane = Paned::builder()
         .orientation(Orientation::Horizontal)
         .shrink_start_child(false)
@@ -291,16 +319,3 @@ pub fn create_app_view(
         app_achievements_stack,
     )
 }
-
-fn create_labeled_value_box(label: &str, value: &gtk::Label, margin_top: i32) -> gtk::Box {
-    let label_widget = gtk::Label::builder().label(label).halign(gtk::Align::Start).build();
-    let spacer = gtk::Box::builder().hexpand(true).build();
-    let box_widget = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .margin_top(margin_top)
-        .build();
-    box_widget.append(&label_widget);
-    box_widget.append(&spacer);
-    box_widget.append(value);
-       box_widget
-   }

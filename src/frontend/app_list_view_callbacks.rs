@@ -51,8 +51,15 @@ pub(crate) fn switch_from_app_list_to_app(
     app_stats_count_value_label.set_label("...");
     app_stack.set_visible_child_name("loading");
     app_id.set(Some(steam_app_object.app_id()));
-    app_metacritic_box.set_visible(steam_app_object.metacritic_score() != u8::MAX);
-    app_metacritic_value_label.set_label(&format!("{}", steam_app_object.metacritic_score()));
+    let metacritic_score = steam_app_object.metacritic_score();
+    let has_metacritic = metacritic_score != u8::MAX;
+    app_metacritic_box.set_visible(has_metacritic);
+    if has_metacritic {
+        app_metacritic_value_label.set_label(&metacritic_score.to_string());
+    }
+    else {
+        app_metacritic_value_label.set_label("");
+    }
 
     if let Some(url) = steam_app_object.image_url() {
         app_shimmer_image.set_url(url.as_str());
@@ -73,14 +80,15 @@ pub(crate) fn switch_from_app_list_to_app(
         .request()
     });
 
-    set_context_popover_to_app_details_context(&menu_model, &application);
+    set_context_popover_to_app_details_context(menu_model, &application);
 
     MainContext::default().spawn_local(clone!(async move {
         match handle.await {
             Ok(_) => {}
             Err(e) => {
                 eprintln!("[LAUNCH APP] Failed to launch app: {:?}", e);
-                return app_stack.set_visible_child_name("failed");
+                app_stack.set_visible_child_name("failed");
+                return;
             }
         }
 

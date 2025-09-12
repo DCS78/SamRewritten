@@ -38,6 +38,23 @@ pub struct GuiArguments {
     pub auto_open: Rc<Cell<u32>>,
 }
 
+#[cfg(target_os = "linux")]
+fn parse_sender_fd(value: &str) -> Option<Sender> {
+    value.parse::<i32>().ok().map(|fd| unsafe { Sender::from_raw_fd(fd) })
+}
+#[cfg(target_os = "windows")]
+fn parse_sender_fd(value: &str) -> Option<Sender> {
+    value.parse::<usize>().ok().map(|h| unsafe { Sender::from_raw_handle(h as RawHandle) })
+}
+#[cfg(target_os = "linux")]
+fn parse_recver_fd(value: &str) -> Option<Recver> {
+    value.parse::<i32>().ok().map(|fd| unsafe { Recver::from_raw_fd(fd) })
+}
+#[cfg(target_os = "windows")]
+fn parse_recver_fd(value: &str) -> Option<Recver> {
+    value.parse::<usize>().ok().map(|h| unsafe { Recver::from_raw_handle(h as RawHandle) })
+}
+
 /// Parses command-line arguments for orchestrator/app mode.
 pub fn parse_cli_arguments() -> CliArguments {
     let mut args = CliArguments {
@@ -47,24 +64,13 @@ pub fn parse_cli_arguments() -> CliArguments {
         tx: None,
     };
 
-    for (index, arg) in env::args().enumerate() {
-        if index == 0 {
-            // Self binary name
-            continue;
-        }
-
-        if arg == "--orchestrator" {
-            args.is_orchestrator = true;
-            continue;
-        }
-
-        // Parse --key=value arguments
-        if let Some((key, value)) = arg.split_once('=') {
-            if value.is_empty() {
-                continue;
+    for (_index, arg) in env::args().enumerate().skip(1) {
+        match arg.as_str() {
+            "--orchestrator" => {
+                args.is_orchestrator = true;
             }
-
-            if key == "--app" {
+            _ if arg.starts_with("--app=") => {
+                let value = &arg[6..];
                 match value.parse::<u32>() {
                     Ok(val) => args.is_app = val,
                     Err(_) => {
@@ -72,56 +78,28 @@ pub fn parse_cli_arguments() -> CliArguments {
                         exit(1);
                     }
                 }
-                continue;
             }
-
-            #[cfg(target_os = "linux")]
-            if key == "--tx" {
-                match value.parse::<i32>() {
-                    Ok(raw_handle) => args.tx = Some(unsafe { Sender::from_raw_fd(raw_handle) }),
-                    Err(_) => {
+            _ if arg.starts_with("--tx=") => {
+                let value = &arg[5..];
+                match parse_sender_fd(value) {
+                    Some(sender) => args.tx = Some(sender),
+                    None => {
                         eprintln!("Invalid value for --tx: {}", value);
                         exit(1);
                     }
                 }
-                continue;
             }
-
-            #[cfg(target_os = "windows")]
-            if key == "--tx" {
-                match value.parse::<usize>() {
-                    Ok(raw_handle) => args.tx = Some(unsafe { Sender::from_raw_handle(raw_handle as RawHandle) }),
-                    Err(_) => {
-                        eprintln!("Invalid value for --tx: {}", value);
-                        exit(1);
-                    }
-                }
-                continue;
-            }
-
-            #[cfg(target_os = "linux")]
-            if key == "--rx" {
-                match value.parse::<i32>() {
-                    Ok(raw_handle) => args.rx = Some(unsafe { Recver::from_raw_fd(raw_handle) }),
-                    Err(_) => {
+            _ if arg.starts_with("--rx=") => {
+                let value = &arg[5..];
+                match parse_recver_fd(value) {
+                    Some(recver) => args.rx = Some(recver),
+                    None => {
                         eprintln!("Invalid value for --rx: {}", value);
                         exit(1);
                     }
                 }
-                continue;
             }
-
-            #[cfg(target_os = "windows")]
-            if key == "--rx" {
-                match value.parse::<usize>() {
-                    Ok(raw_handle) => args.rx = Some(unsafe { Recver::from_raw_handle(raw_handle as RawHandle) }),
-                    Err(_) => {
-                        eprintln!("Invalid value for --rx: {}", value);
-                        exit(1);
-                    }
-                }
-                continue;
-            }
+            _ => {}
         }
     }
 

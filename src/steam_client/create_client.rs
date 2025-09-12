@@ -55,7 +55,7 @@ pub fn load_steamclient_library() -> Result<Library, Box<dyn std::error::Error>>
 /// Creates a new ISteamClient interface and retrieves callback function pointers.
 pub fn new_steam_client_interface(
     steamclient_so: &Library,
-    ) -> Result<
+) -> Result<
     (
         *mut ISteamClient,
         Symbol<'_, SteamGetCallbackFn>,
@@ -63,34 +63,36 @@ pub fn new_steam_client_interface(
     ),
     Box<dyn std::error::Error>,
 > {
-    unsafe {
-        let create_interface: Symbol<CreateInterfaceFn> = steamclient_so.get(b"CreateInterface")?;
-        let steam_get_callback: Symbol<'_, SteamGetCallbackFn> =
-            steamclient_so.get(b"Steam_BGetCallback")?;
-        let steam_free_last_callback: Symbol<'_, SteamFreeLastCallbackFn> =
-            steamclient_so.get(b"Steam_FreeLastCallback")?;
+    // Scope unsafe as tightly as possible
+    let (create_interface, steam_get_callback, steam_free_last_callback) = unsafe {
+        (
+            steamclient_so.get::<CreateInterfaceFn>(b"CreateInterface")?,
+            steamclient_so.get::<SteamGetCallbackFn>(b"Steam_BGetCallback")?,
+            steamclient_so.get::<SteamFreeLastCallbackFn>(b"Steam_FreeLastCallback")?,
+        )
+    };
 
-        let mut return_code = 1;
-        let client = create_interface(
+    let mut return_code = 1;
+    let client = unsafe {
+        create_interface(
             STEAMCLIENT_INTERFACE_VERSION.as_ptr() as *const c_char,
             &mut return_code,
-        );
+        )
+    };
 
-        if return_code != 0 {
-            return Err(Box::from(format!(
-                "Steam client interface creation failed with code {}",
-                return_code
-            )));
-        }
-
-        if client.is_null() {
-            return Err(Box::from(
-                "Steam client failed to create interface (pointer is NULL)",
-            ));
-        }
-
-        Ok((client, steam_get_callback, steam_free_last_callback))
+    if return_code != 0 {
+        return Err(format!(
+            "Steam client interface creation failed with code {}",
+            return_code
+        )
+        .into());
     }
+
+    if client.is_null() {
+        return Err("Steam client failed to create interface (pointer is NULL)".into());
+    }
+
+    Ok((client, steam_get_callback, steam_free_last_callback))
 }
 
 /// Loads the Steam client library and creates a new SteamClient wrapper.

@@ -1,4 +1,3 @@
-use gtk::glib;
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2025 Paul <abonnementspaul (at) gmail.com>
 //
@@ -137,17 +136,13 @@ pub fn create_achievements_view(
 
 /// Count the number of unlocked achievements in the given model.
 pub fn count_unlocked_achievements(model: &ListStore) -> u32 {
-    model
-        .iter()
-        .filter_map(|ach| {
-            ach.ok().and_then(|obj: glib::Object| {
-                let g_achievement = obj.downcast::<GAchievementObject>().ok()?;
-                if g_achievement.is_achieved() {
-                    Some(())
-                } else {
-                    None
-                }
-            })
-        })
-        .count() as u32
+    let mut count = 0;
+    for ach in model.iter::<GAchievementObject>() {
+        if let Ok(g_achievement) = ach {
+            if g_achievement.is_achieved() {
+                count += 1;
+            }
+        }
+    }
+    count
 }

@@ -19,8 +19,7 @@ use std::{env, path::PathBuf};
 /// Returns the absolute path to the current executable, resolving symlinks.
 pub fn get_executable_path() -> Result<PathBuf, SamError> {
     let exe = env::current_exe().map_err(|_| SamError::UnknownError)?;
-    let canonical = exe.canonicalize().map_err(|_| SamError::UnknownError)?;
-    Ok(canonical)
+    exe.canonicalize().map_err(|_| SamError::UnknownError)
 }
 
 /// Returns a valid directory for persistent app data (Linux).
@@ -30,31 +29,25 @@ pub fn get_app_cache_dir() -> Result<String, SamError> {
     use std::fs;
     if let Ok(snap_name) = env::var("SNAP_NAME") {
         if snap_name == "samrewritten" {
-            let snap_user_common = match env::var("SNAP_USER_COMMON") {
-                Ok(val) => val,
-                Err(e) => {
-                    log::warn!("SNAP_USER_COMMON not set: {e}, using /tmp");
-                    String::from("/tmp")
-                }
-            };
+            let snap_user_common = env::var("SNAP_USER_COMMON").unwrap_or_else(|e| {
+                log::warn!("SNAP_USER_COMMON not set: {e}, using /tmp");
+                String::from("/tmp")
+            });
             return Ok(snap_user_common);
         }
         // Most likely a dev config
         return Ok(".".to_owned());
     }
     // Non-snap release
-    let home = match env::var("HOME") {
-        Ok(val) => val,
-        Err(e) => {
-            log::warn!("HOME not set: {e}, using /tmp");
-            "/tmp".to_owned()
-        }
-    };
-    let folder = home + "/.cache/samrewritten";
-    fs::create_dir_all(&folder).map_err(|e| {
+    let home = env::var("HOME").unwrap_or_else(|e| {
+        log::warn!("HOME not set: {e}, using /tmp");
+        "/tmp".to_owned()
+    });
+    let folder = format!("{home}/.cache/samrewritten");
+    if let Err(e) = fs::create_dir_all(&folder) {
         log::error!("Failed to create app cache dir {folder}: {e}");
-        SamError::UnknownError
-    })?;
+        return Err(SamError::UnknownError);
+    }
     Ok(folder)
 }
 
@@ -63,8 +56,7 @@ pub fn get_app_cache_dir() -> Result<String, SamError> {
 #[cfg(target_os = "windows")]
 pub fn get_app_cache_dir() -> Result<String, SamError> {
     let temp = env::temp_dir();
-    let temp_str = temp.to_str().ok_or(SamError::UnknownError)?;
-    Ok(temp_str.to_owned())
+    temp.to_str().map(|s| s.to_owned()).ok_or(SamError::UnknownError)
 }
 
 /// Returns the path to the Steam client library (Linux).
@@ -73,19 +65,19 @@ pub fn get_app_cache_dir() -> Result<String, SamError> {
 pub fn get_steamclient_lib_path() -> Result<PathBuf, SamError> {
     use std::path::Path;
     if let Ok(real_home) = env::var("SNAP_REAL_HOME") {
-        let path_str = real_home + "/snap/steam/common/.local/share/Steam/linux64/steamclient.so";
+        let path_str = format!("{real_home}/snap/steam/common/.local/share/Steam/linux64/steamclient.so");
         return Ok(Path::new(&path_str).to_owned());
     }
     let home = env::var("HOME").map_err(|_| SamError::UnknownError)?;
     let lib_paths = [
-        home.clone() + "/snap/steam/common/.local/share/Steam/linux64/steamclient.so",
-        home.clone() + "/.steam/debian-installation/linux64/steamclient.so",
-        home.clone() + "/.steam/sdk64/steamclient.so",
-        home.clone() + "/.steam/steam/linux64/steamclient.so",
-        home + "/.steam/root/linux64/steamclient.so",
+        format!("{home}/snap/steam/common/.local/share/Steam/linux64/steamclient.so"),
+        format!("{home}/.steam/debian-installation/linux64/steamclient.so"),
+        format!("{home}/.steam/sdk64/steamclient.so"),
+        format!("{home}/.steam/steam/linux64/steamclient.so"),
+        format!("{home}/.steam/root/linux64/steamclient.so"),
     ];
-    for lib_path in lib_paths {
-        let path = Path::new(&lib_path);
+    for lib_path in &lib_paths {
+        let path = Path::new(lib_path);
         if path.exists() {
             return Ok(path.into());
         }
@@ -107,16 +99,14 @@ pub fn get_steamclient_lib_path() -> Result<PathBuf, SamError> {
     // Try HKEY_CURRENT_USER first
     if let Ok(subkey) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(REG_PATH) {
         if let Ok(value) = subkey.get_value::<String, _>(VALUE_NAME) {
-            let path = PathBuf::from(value).join("steamclient64.dll");
-            return Ok(path);
+            return Ok(PathBuf::from(value).join("steamclient64.dll"));
         }
     }
 
     // Fallback to HKEY_LOCAL_MACHINE
     if let Ok(subkey) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(REG_PATH) {
         if let Ok(value) = subkey.get_value::<String, _>(VALUE_NAME) {
-            let path = PathBuf::from(value).join("steamclient64.dll");
-            return Ok(path);
+            return Ok(PathBuf::from(value).join("steamclient64.dll"));
         }
     }
 
@@ -129,21 +119,20 @@ pub fn get_steamclient_lib_path() -> Result<PathBuf, SamError> {
 pub fn get_user_game_stats_schema_path(app_id: &u32) -> Result<String, SamError> {
     use std::path::Path;
     if let Ok(real_home) = env::var("SNAP_REAL_HOME") {
-        return Ok(real_home
-            + "/snap/steam/common/.local/share/Steam/appcache/stats/UserGameStatsSchema_"
-            + &app_id.to_string()
-            + ".bin");
+        return Ok(format!(
+            "{real_home}/snap/steam/common/.local/share/Steam/appcache/stats/UserGameStatsSchema_{app_id}.bin"
+        ));
     }
     let home = env::var("HOME").map_err(|_| SamError::UnknownError)?;
     let install_dirs = [
-        home.clone() + "/snap/steam/common/.local/share/Steam",
-        home.clone() + "/.steam/debian-installation",
-        home.clone() + "/.steam/steam",
-        home + "/.steam/root",
+        format!("{home}/snap/steam/common/.local/share/Steam"),
+        format!("{home}/.steam/debian-installation"),
+        format!("{home}/.steam/steam"),
+        format!("{home}/.steam/root"),
     ];
-    for install_dir in install_dirs {
-        if Path::new(&install_dir).exists() {
-            return Ok(install_dir + &format!("/appcache/stats/UserGameStatsSchema_{app_id}.bin"));
+    for install_dir in &install_dirs {
+        if Path::new(install_dir).exists() {
+            return Ok(format!("{install_dir}/appcache/stats/UserGameStatsSchema_{app_id}.bin"));
         }
     }
     Err(SamError::UnknownError)
@@ -164,7 +153,7 @@ pub fn get_user_game_stats_schema_path(app_id: &u32) -> Result<String, SamError>
         .get_value::<String, &'static str>("SteamPath")
         .map_err(|_| SamError::UnknownError)?;
 
-    Ok(value + &format!("/appcache/stats/UserGameStatsSchema_{app_id}.bin"))
+    Ok(format!("{value}/appcache/stats/UserGameStatsSchema_{app_id}.bin"))
 }
 
 /// Returns the path to the local app banner image (Linux).
@@ -173,21 +162,20 @@ pub fn get_user_game_stats_schema_path(app_id: &u32) -> Result<String, SamError>
 pub fn get_local_app_banner_file_path(app_id: &u32) -> Result<String, SamError> {
     use std::path::Path;
     if let Ok(real_home) = env::var("SNAP_REAL_HOME") {
-        return Ok(real_home
-            + "/snap/steam/common/.local/share/Steam/appcache/librarycache/"
-            + &app_id.to_string()
-            + "/header.jpg");
+        return Ok(format!(
+            "{real_home}/snap/steam/common/.local/share/Steam/appcache/librarycache/{app_id}/header.jpg"
+        ));
     }
     let home = env::var("HOME").map_err(|_| SamError::UnknownError)?;
     let install_dirs = [
-        home.clone() + "/snap/steam/common/.local/share/Steam",
-        home.clone() + "/.steam/debian-installation",
-        home.clone() + "/.steam/steam",
-        home + "/.steam/root",
+        format!("{home}/snap/steam/common/.local/share/Steam"),
+        format!("{home}/.steam/debian-installation"),
+        format!("{home}/.steam/steam"),
+        format!("{home}/.steam/root"),
     ];
-    for install_dir in install_dirs {
-        if Path::new(&install_dir).exists() {
-            return Ok(install_dir + &format!("/appcache/librarycache/{app_id}/header.jpg"));
+    for install_dir in &install_dirs {
+        if Path::new(install_dir).exists() {
+            return Ok(format!("{install_dir}/appcache/librarycache/{app_id}/header.jpg"));
         }
     }
     Err(SamError::UnknownError)
@@ -208,5 +196,5 @@ pub fn get_local_app_banner_file_path(app_id: &u32) -> Result<String, SamError> 
         .get_value::<String, &'static str>("SteamPath")
         .map_err(|_| SamError::UnknownError)?;
 
-    Ok(value + &format!("/appcache/librarycache/{app_id}/header.jpg"))
+    Ok(format!("{value}/appcache/librarycache/{app_id}/header.jpg"))
 }

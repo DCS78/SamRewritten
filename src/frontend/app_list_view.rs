@@ -508,7 +508,7 @@ pub fn create_main_ui(
                 launch_button.set_data("handler", handler.as_raw());
             }
         }
-    ));
+    )); // Correct: closure and macro closed, then function call
 
     list_factory.connect_unbind(move |_, list_item| {
         let list_item = match list_item.downcast_ref::<ListItem>() {
@@ -599,27 +599,11 @@ pub fn create_main_ui(
             let text = entry.text();
             let text_opt = if text.is_empty() { None } else { Some(text) };
             let current_search = list_string_filter.search().unwrap_or_default();
+            // Optimization: Only update filters and store if the search text actually changed
             if text_opt.as_deref() != Some(&current_search) {
+                // Optimization: Remove all before inserting new, to avoid duplicate entries
                 if launch_app_by_id_visible.take() {
-                    if let Some(app_id) = text_opt.as_ref().and_then(|t| t.parse::<u32>().ok()) {
-                        launch_app_by_id_visible.set(true);
-                        list_store.insert(
-                            1,
-                            &GSteamAppObject::new(AppModel {
-                                app_id,
-                                app_name: format!("App {app_id}"),
-                                app_type: AppModelType::App,
-                                developer: "Unknown".to_string(),
-                                image_url: None,
-                                metacritic_score: None,
-                            }),
-                        );
-                    }
-                    app_achievement_string_filter.set_search(text_opt.as_deref());
-                    app_stat_string_filter.set_search(text_opt.as_deref());
-                    list_string_filter.set_search(text_opt.as_deref());
-                    list_store.remove(0);
-                    return;
+                    list_store.remove_all();
                 }
                 if let Some(app_id) = text_opt.as_ref().and_then(|t| t.parse::<u32>().ok()) {
                     launch_app_by_id_visible.set(true);

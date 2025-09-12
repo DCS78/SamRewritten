@@ -76,19 +76,19 @@ pub trait SamSerializable {
     where
         Self: Sized + Serialize,
     {
-        let serialized = match serde_json::to_string(&self) {
+        // Use serde_json::to_vec for direct serialization to bytes, avoiding intermediate String
+        let serialized = match serde_json::to_vec(&self) {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("[IPC] Serialization error: {e}");
                 return vec![];
             }
         };
-        let s_bytes = serialized.as_bytes();
-        let length = s_bytes.len();
+        let length = serialized.len();
         let length_bytes = length.to_le_bytes();
-        let mut result = Vec::with_capacity(length_bytes.len() + s_bytes.len());
+        let mut result = Vec::with_capacity(length_bytes.len() + serialized.len());
         result.extend_from_slice(&length_bytes);
-        result.extend_from_slice(s_bytes);
+        result.extend_from_slice(&serialized);
         result
     }
 
@@ -98,27 +98,21 @@ pub trait SamSerializable {
         Self: DeserializeOwned,
     {
         let mut buffer_len = [0u8; std::mem::size_of::<usize>()];
-        match rx.read_exact(&mut buffer_len) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("[IPC] Error reading length from pipe: {e}");
-                return Err(SamError::SocketCommunicationFailed);
-            }
+        if let Err(e) = rx.read_exact(&mut buffer_len) {
+            eprintln!("[IPC] Error reading length from pipe: {e}");
+            return Err(SamError::SocketCommunicationFailed);
         }
 
         let data_length = usize::from_le_bytes(buffer_len);
         let mut buffer = vec![0u8; data_length];
 
-        match rx.read_exact(&mut buffer) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("[IPC] Error reading message from pipe: {e}");
-                return Err(SamError::SocketCommunicationFailed);
-            }
-        };
+        if let Err(e) = rx.read_exact(&mut buffer) {
+            eprintln!("[IPC] Error reading message from pipe: {e}");
+            return Err(SamError::SocketCommunicationFailed);
+        }
 
-        let message = String::from_utf8_lossy(&buffer);
-        let message: Self = match serde_json::from_str(&message) {
+        // Avoid String conversion, deserialize directly from bytes
+        let message: Self = match serde_json::from_slice(&buffer) {
             Ok(msg) => msg,
             Err(e) => {
                 eprintln!("[IPC] Failed to deserialize message: {e}");

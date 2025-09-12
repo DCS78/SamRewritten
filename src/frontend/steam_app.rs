@@ -27,21 +27,15 @@ impl GSteamAppObject {
     /// Create a new GSteamAppObject from an AppModel.
     pub fn new(app: AppModel) -> Self {
         // Prefer local image if available, otherwise use remote.
-        let local_banner_path = get_local_app_banner_file_path(&app.app_id);
-        let image_url = if let Ok(path) = local_banner_path {
-            if Path::new(&path).exists() {
-                Some("file://".to_string() + &path)
-            } else {
-                app.image_url
-            }
-        } else {
-            app.image_url
+        let image_url = match get_local_app_banner_file_path(&app.app_id) {
+            Ok(ref path) if Path::new(path).exists() => Some(format!("file://{}", path)),
+            _ => app.image_url.clone(),
         };
 
         Object::builder()
             .property("app_id", app.app_id)
-            .property("app_name", app.app_name)
-            .property("developer", app.developer)
+            .property("app_name", app.app_name.clone())
+            .property("developer", app.developer.clone())
             .property("image_url", image_url)
             .property(
                 "metacritic_score",

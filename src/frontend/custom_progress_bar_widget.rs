@@ -69,10 +69,15 @@ mod imp {
             let widget = self.obj();
             let width = widget.width() as f32;
             let height = widget.height() as f32;
-            let value = self.value.get().clamp(0.0, 100.0);
-            let progress_width = width * (value / 100.0);
-            let progress_rect = Rect::new(0.0, 0.0, progress_width, height);
-            snapshot.append_color(&BAR_COLOR, &progress_rect);
+            // Use f32::clamp for clarity and possible inlining
+            let value = f32::clamp(self.value.get(), 0.0, 100.0);
+            if value > 0.0 && width > 0.0 && height > 0.0 {
+                let progress_width = width * (value / 100.0);
+                if progress_width > 0.0 {
+                    let progress_rect = Rect::new(0.0, 0.0, progress_width, height);
+                    snapshot.append_color(&BAR_COLOR, &progress_rect);
+                }
+            }
         }
     }
 }

@@ -26,13 +26,18 @@ use gtk::{
     ScrolledWindow, SelectionMode, SignalListItemFactory, Stack, StackTransitionType, Widget,
 };
 
+const ICON_NORMAL: &str = "normal";
+const ICON_LOCKED: &str = "locked";
+
 /// Create the header for the automatic achievements view.
 fn create_header(application: &MainApplication) -> (ListBox, Button) {
     let list = ListBox::builder()
         .selection_mode(SelectionMode::None)
         .build();
-    let hbox = Box::new(Orientation::Horizontal, 10);
-    hbox.set_spacing(5);
+    let hbox = Box::builder()
+        .orientation(Orientation::Horizontal)
+        .spacing(5)
+        .build();
 
     let button_stop = Button::builder().icon_name("go-previous").build();
     let label = Label::builder().label("Stop and go back").build();
@@ -84,7 +89,10 @@ pub fn create_achievements_automatic_view(
         }
     });
 
-    let vbox = Box::new(Orientation::Vertical, 5);
+    let vbox = Box::builder()
+        .orientation(Orientation::Vertical)
+        .spacing(5)
+        .build();
     vbox.append(&header);
     vbox.append(&app_achievements_scrolled_window);
     let app_achievements_frame = Frame::builder()
@@ -108,8 +116,8 @@ fn setup_achievement_list_item(list_item: &gtk::ListItem) {
     let icon_stack = Stack::builder()
         .transition_type(StackTransitionType::RotateLeftRight)
         .build();
-    icon_stack.add_named(&normal_icon, Some("normal"));
-    icon_stack.add_named(&locked_icon, Some("locked"));
+    icon_stack.add_named(&normal_icon, Some(ICON_NORMAL));
+    icon_stack.add_named(&locked_icon, Some(ICON_LOCKED));
 
     let icon_box = Box::builder()
         .orientation(Orientation::Vertical)
@@ -193,14 +201,8 @@ fn setup_achievement_list_item(list_item: &gtk::ListItem) {
         .chain_property::<GAchievementObject>("is-achieved");
 
     let achieved_visible_icon_closure = glib::RustClosure::new(|values: &[glib::Value]| {
-        let is_achieved = match values.get(1).and_then(|val| val.get::<bool>().ok()) {
-            Some(val) => val,
-            _none => {
-                log::warn!("Failed to get is_achieved as bool in achieved_visible_icon_closure");
-                false
-            }
-        };
-        let child_name = if is_achieved { "normal" } else { "locked" };
+        let is_achieved = values.get(1).and_then(|val| val.get::<bool>().ok()).unwrap_or(false);
+        let child_name = if is_achieved { ICON_NORMAL } else { ICON_LOCKED };
         Some(child_name.to_value())
     });
 

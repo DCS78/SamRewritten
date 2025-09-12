@@ -283,9 +283,9 @@ impl fmt::Display for AchievementDefinition {
             f,
             "{}: {}",
             if self.name.is_empty() {
-                self.id.clone()
+                &self.id
             } else {
-                self.name.clone()
+                &self.name
             },
             self.permission
         )

@@ -38,6 +38,7 @@ fn main() -> glib::ExitCode {
     let arguments = parse_cli_arguments();
 
     if arguments.is_orchestrator || arguments.is_app > 0 {
+        // Use pattern matching to avoid unnecessary allocations
         let (mut tx, mut rx) = match (arguments.tx, arguments.rx) {
             (Some(tx), Some(rx)) => (tx, rx),
             _ => {
@@ -53,6 +54,7 @@ fn main() -> glib::ExitCode {
         return ExitCode::from(exit_code as u8);
     }
 
+    // Avoid allocating error strings unless needed
     let current_exe = match get_executable_path() {
         Ok(path) => path,
         Err(e) => {
@@ -60,7 +62,7 @@ fn main() -> glib::ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let orchestrator = match BidirChild::new(Command::new(current_exe).arg("--orchestrator")) {
+    let orchestrator = match BidirChild::new(Command::new(&current_exe).arg("--orchestrator")) {
         Ok(child) => child,
         Err(e) => {
             eprintln!("Failed to spawn orchestrator process: {e}");

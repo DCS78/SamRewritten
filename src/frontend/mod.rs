@@ -55,22 +55,20 @@ fn shutdown() {
         eprintln!("[CLIENT] Failed to send shutdown message: {}", err);
         return;
     }
-    match DEFAULT_PROCESS.write() {
-        Ok(mut guard) => {
-            match &mut *guard {
-                Some(bidir) => {
-                    if let Err(e) = bidir.child.wait() {
-                        log::error!("[CLIENT] Failed to wait on orchestrator to shutdown: {e}");
-                    }
-                }
-                _none => {
-                    log::error!("[CLIENT] No orchestrator process to shutdown");
-                }
-            }
-        }
+    // Extract the child out of the lock to minimize lock duration
+    let maybe_child = match DEFAULT_PROCESS.write() {
+        Ok(mut guard) => guard.take(),
         Err(e) => {
             log::error!("[CLIENT] Failed to acquire write lock on DEFAULT_PROCESS: {e}");
+            return;
         }
+    };
+    if let Some(mut bidir) = maybe_child {
+        if let Err(e) = bidir.child.wait() {
+            log::error!("[CLIENT] Failed to wait on orchestrator to shutdown: {e}");
+        }
+    } else {
+        log::error!("[CLIENT] No orchestrator process to shutdown");
     }
 }
 
