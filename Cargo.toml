@@ -27,6 +27,8 @@ reqwest = { version = "0.12.23", features = ["blocking"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
 glib = "0.18.0"
+itoa = "1.0.10"
+ryu = "1.0.15"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55.0"
